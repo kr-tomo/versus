@@ -1,0 +1,315 @@
+{
+  "id": "classic",
+  "name": "클래식",
+  "characters": {
+    "sword": {
+      "name": "알드릭",
+      "en": "Sir Aldric",
+      "title": "잉글랜드 십자군 기사",
+      "color": "#c23b3b",
+      "sheet": "characters/sword.svg",
+      "portrait": "portraits/sword.svg",
+      "cell": [
+        220,
+        190
+      ],
+      "origin": [
+        70,
+        180
+      ],
+      "cols": 5,
+      "scale": 0.8,
+      "frames": {
+        "idle0": 0,
+        "idle1": 1,
+        "walk0": 2,
+        "walk1": 3,
+        "walk2": 4,
+        "walk3": 5,
+        "windup": 6,
+        "attack": 7,
+        "guard": 8,
+        "jump": 9,
+        "fall": 10,
+        "jumpAtk": 11,
+        "airGuard": 12,
+        "hit": 13,
+        "win": 14
+      }
+    },
+    "spear": {
+      "name": "이운",
+      "en": "Lee Woon",
+      "title": "조선 무관 장군",
+      "color": "#2c4f9e",
+      "sheet": "characters/spear.svg",
+      "portrait": "portraits/spear.svg",
+      "cell": [
+        220,
+        190
+      ],
+      "origin": [
+        70,
+        180
+      ],
+      "cols": 5,
+      "scale": 0.8,
+      "frames": {
+        "idle0": 0,
+        "idle1": 1,
+        "walk0": 2,
+        "walk1": 3,
+        "walk2": 4,
+        "walk3": 5,
+        "windup": 6,
+        "attack": 7,
+        "guard": 8,
+        "jump": 9,
+        "fall": 10,
+        "jumpAtk": 11,
+        "airGuard": 12,
+        "hit": 13,
+        "win": 14
+      }
+    },
+    "axe": {
+      "name": "비요른",
+      "en": "Bjørn",
+      "title": "노르드 바이킹 족장",
+      "color": "#c8642a",
+      "sheet": "characters/axe.svg",
+      "portrait": "portraits/axe.svg",
+      "cell": [
+        220,
+        190
+      ],
+      "origin": [
+        70,
+        180
+      ],
+      "cols": 5,
+      "scale": 0.8,
+      "frames": {
+        "idle0": 0,
+        "idle1": 1,
+        "walk0": 2,
+        "walk1": 3,
+        "walk2": 4,
+        "walk3": 5,
+        "windup": 6,
+        "attack": 7,
+        "guard": 8,
+        "jump": 9,
+        "fall": 10,
+        "jumpAtk": 11,
+        "airGuard": 12,
+        "hit": 13,
+        "win": 14
+      }
+    },
+    "dagger": {
+      "name": "자라",
+      "en": "Zahra",
+      "title": "페르시아 사막의 암살자",
+      "color": "#a52a2a",
+      "sheet": "characters/dagger.svg",
+      "portrait": "portraits/dagger.svg",
+      "cell": [
+        220,
+        190
+      ],
+      "origin": [
+        70,
+        180
+      ],
+      "cols": 5,
+      "scale": 0.8,
+      "frames": {
+        "idle0": 0,
+        "idle1": 1,
+        "walk0": 2,
+        "walk1": 3,
+        "walk2": 4,
+        "walk3": 5,
+        "windup": 6,
+        "attack": 7,
+        "guard": 8,
+        "jump": 9,
+        "fall": 10,
+        "jumpAtk": 11,
+        "airGuard": 12,
+        "hit": 13,
+        "win": 14
+      }
+    },
+    "fist": {
+      "name": "혜명",
+      "en": "Huiming",
+      "title": "소림사 무승",
+      "color": "#e58a1f",
+      "sheet": "characters/fist.svg",
+      "portrait": "portraits/fist.svg",
+      "cell": [
+        220,
+        190
+      ],
+      "origin": [
+        70,
+        180
+      ],
+      "cols": 5,
+      "scale": 0.8,
+      "frames": {
+        "idle0": 0,
+        "idle1": 1,
+        "walk0": 2,
+        "walk1": 3,
+        "walk2": 4,
+        "walk3": 5,
+        "windup": 6,
+        "attack": 7,
+        "guard": 8,
+        "jump": 9,
+        "fall": 10,
+        "jumpAtk": 11,
+        "airGuard": 12,
+        "hit": 13,
+        "win": 14
+      }
+    }
+  },
+  "maps": {
+    "lava": {
+      "far": "maps/lava/far.svg",
+      "ground": "maps/lava/ground.svg",
+      "trap": {
+        "sheet": "maps/lava/trap.svg",
+        "cell": [
+          130,
+          114
+        ],
+        "origin": [
+          20,
+          70
+        ],
+        "frames": 2,
+        "width": 90
+      },
+      "platforms": {
+        "sheet": "maps/lava/platforms.svg",
+        "cellH": 48,
+        "origin": [
+          4,
+          4
+        ],
+        "widths": [
+          120,
+          150,
+          180,
+          210
+        ]
+      },
+      "extras": {}
+    },
+    "jungle": {
+      "far": "maps/jungle/far.svg",
+      "ground": "maps/jungle/ground.svg",
+      "trap": {
+        "sheet": "maps/jungle/trap.svg",
+        "cell": [
+          120,
+          114
+        ],
+        "origin": [
+          20,
+          70
+        ],
+        "frames": 2,
+        "width": 80
+      },
+      "platforms": {
+        "sheet": "maps/jungle/platforms.svg",
+        "cellH": 48,
+        "origin": [
+          4,
+          4
+        ],
+        "widths": [
+          120,
+          150,
+          180,
+          210
+        ]
+      },
+      "extras": {
+        "ropes": "#c8a46a"
+      }
+    },
+    "seoul": {
+      "far": "maps/seoul/far.svg",
+      "ground": "maps/seoul/ground.svg",
+      "trap": {
+        "sheet": "maps/seoul/trap.svg",
+        "cell": [
+          120,
+          114
+        ],
+        "origin": [
+          20,
+          70
+        ],
+        "frames": 2,
+        "width": 80
+      },
+      "platforms": {
+        "sheet": "maps/seoul/platforms.svg",
+        "cellH": 48,
+        "origin": [
+          4,
+          4
+        ],
+        "widths": [
+          120,
+          150,
+          180,
+          210
+        ]
+      },
+      "extras": {
+        "posts": "#9aa3b5"
+      }
+    },
+    "tundra": {
+      "far": "maps/tundra/far.svg",
+      "ground": "maps/tundra/ground.svg",
+      "trap": {
+        "sheet": "maps/tundra/trap.svg",
+        "cell": [
+          130,
+          114
+        ],
+        "origin": [
+          20,
+          70
+        ],
+        "frames": 2,
+        "width": 90
+      },
+      "platforms": {
+        "sheet": "maps/tundra/platforms.svg",
+        "cellH": 48,
+        "origin": [
+          4,
+          4
+        ],
+        "widths": [
+          120,
+          150,
+          180,
+          210
+        ]
+      },
+      "extras": {}
+    }
+  }
+}

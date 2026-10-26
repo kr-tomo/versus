@@ -1,0 +1,19 @@
+{
+  "name": "VERSUS - 중세 무사 대전 격투",
+  "short_name": "VERSUS",
+  "description": "공격과 방어만으로 싸우는 2인/컴퓨터 대전 격투 게임",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#14121a",
+  "theme_color": "#14121a",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14121a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VERSUS">
+<title>VERSUS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="safe"></div>
+<canvas id="view" hidden></canvas>
+<div id="controls" hidden></div>
+<button id="pauseBtn" hidden aria-label="일시정지"></button>
+
+<section id="title" class="screen">
+  <div class="title-art">
+    <img src="themes/classic/portraits/sword.svg" alt="">
+    <h1>VERSUS</h1>
+    <img src="themes/classic/portraits/axe.svg" alt="" class="flip">
+  </div>
+  <p class="tagline">중세 무사 대전 격투</p>
+  <div class="menu">
+    <button data-mode="2p">2인 대전</button>
+    <button data-mode="easy">컴퓨터 · 쉬움</button>
+    <button data-mode="hard">컴퓨터 · 어려움</button>
+  </div>
+  <p class="hint portrait-only">가로로 돌리면 화면이 더 커집니다</p>
+</section>
+
+<section id="setup" class="screen" hidden>
+  <header><button class="back" aria-label="뒤로">◀</button><h2>대전 설정</h2><span class="mode-label"></span></header>
+  <div class="pick">
+    <div class="side" data-player="0"><div class="who"></div><div class="roster"></div><div class="info"></div></div>
+    <div class="vs">VS</div>
+    <div class="side" data-player="1"><div class="who"></div><div class="roster"></div><div class="info"></div></div>
+  </div>
+  <div class="maps"></div>
+  <footer>
+    <button id="winsBtn" class="toggle"></button>
+    <button id="timeBtn" class="toggle"></button>
+    <button id="startBtn" class="primary">시작</button>
+  </footer>
+</section>
+
+<section id="pause" class="screen overlay" hidden>
+  <h2>일시정지</h2>
+  <div class="menu"><button id="resumeBtn">계속하기</button><button id="quitBtn">메뉴로</button></div>
+</section>
+
+<section id="result" class="screen overlay" hidden>
+  <h2 id="resultText"></h2>
+  <div class="menu"><button id="againBtn">다시 하기</button><button id="menuBtn">메뉴로</button></div>
+</section>
+
+<div id="loading" hidden>불러오는 중…</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
