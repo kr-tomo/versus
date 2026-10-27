@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="260" height="114" viewBox="0 0 260 114"><g transform="translate(20 70)"><defs><linearGradient id="lvMag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe066"/><stop offset=".35" stop-color="#ff8a1a"/><stop offset="1" stop-color="#b3200a"/></linearGradient>
+      <radialGradient id="lvGlow2"><stop offset="0" stop-color="#ffb347" stop-opacity=".9"/><stop offset="1" stop-color="#ff4500" stop-opacity="0"/></radialGradient></defs>
+      <ellipse cx="45" cy="0" rx="61" ry="26" fill="url(#lvGlow2)" opacity=".8"/>
+      <rect x="0" y="2" width="90" height="42" fill="url(#lvMag)"/>
+      <path d="M0 4 Q22.5 -2 45 4 T90 4" stroke="#fff3a8" stroke-width="2.5" fill="none"/>
+      <path d="M-4 0 L2 44 M94 0 L88 44" stroke="#160c0a" stroke-width="6"/><circle cx="12" cy="9.7" r="2.9" fill="#ffe066" stroke="#ff8a1a" stroke-width="1.5"/><circle cx="34.8" cy="10.3" r="5" fill="#ffe066" stroke="#ff8a1a" stroke-width="1.5"/><circle cx="70.2" cy="8.2" r="2.7" fill="#ffe066" stroke="#ff8a1a" stroke-width="1.5"/><circle cx="37.6" cy="10.8" r="5.1" fill="#ffe066" stroke="#ff8a1a" stroke-width="1.5"/></g><g transform="translate(150 70)"><defs><linearGradient id="lvMag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe066"/><stop offset=".35" stop-color="#ff8a1a"/><stop offset="1" stop-color="#b3200a"/></linearGradient>
+      <radialGradient id="lvGlow2"><stop offset="0" stop-color="#ffb347" stop-opacity=".9"/><stop offset="1" stop-color="#ff4500" stop-opacity="0"/></radialGradient></defs>
+      <ellipse cx="45" cy="0" rx="61" ry="30" fill="url(#lvGlow2)" opacity=".8"/>
+      <rect x="0" y="2" width="90" height="42" fill="url(#lvMag)"/>
+      <path d="M0 6 Q22.5 6 45 4 T90 6" stroke="#fff3a8" stroke-width="2.5" fill="none"/>
+      <path d="M-4 0 L2 44 M94 0 L88 44" stroke="#160c0a" stroke-width="6"/><circle cx="12" cy="11.5" r="5.9" fill="#ffe066" stroke="#ff8a1a" stroke-width="1.5"/><circle cx="65.1" cy="17.8" r="5.9" fill="#ffe066" stroke="#ff8a1a" stroke-width="1.5"/><circle cx="73.3" cy="17.7" r="5.4" fill="#ffe066" stroke="#ff8a1a" stroke-width="1.5"/><circle cx="33.3" cy="16.1" r="3.2" fill="#ffe066" stroke="#ff8a1a" stroke-width="1.5"/><circle cx="27" cy="-12" r="2.5" fill="#ffb347"/><circle cx="63" cy="-20" r="2" fill="#ffe066"/></g></svg>
