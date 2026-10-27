@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="240" height="114" viewBox="0 0 240 114"><g transform="translate(20 70)"><defs><filter id="soGlow2" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-      <rect x="6" y="0" width="68" height="44" fill="#06070b"/><ellipse cx="40" cy="2" rx="36" ry="5" fill="#0b0d14" stroke="#5d606c" stroke-width="2"/>
-      <g filter="url(#soGlow2)"><polyline points="16,-2 26,-22 32,-12 42,-34 48,-18 58,-28 70,-4" stroke="#bff6ff" stroke-width="2.5" fill="none"/><polyline points="30,0 38,-14 50,-8 62,-20" stroke="#ffe94d" stroke-width="2" fill="none"/></g>
-      <path d="M-6 0 l7 -22 l7 22 z M72 0 l7 -22 l7 22 z" fill="#ff7a1a" stroke="#2a1508" stroke-width="1.5"/>
-      <path d="M-3 -9 h8 M75 -9 h8" stroke="#fff" stroke-width="2.5"/></g><g transform="translate(140 70)"><defs><filter id="soGlow2" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-      <rect x="6" y="0" width="68" height="44" fill="#06070b"/><ellipse cx="40" cy="2" rx="36" ry="5" fill="#0b0d14" stroke="#5d606c" stroke-width="2"/>
-      <g filter="url(#soGlow2)"><polyline points="12,-4 20,-26 30,-14 38,-36 48,-16 62,-30 70,-4" stroke="#bff6ff" stroke-width="2.5" fill="none"/><polyline points="24,0 34,-18 46,-6 56,-22" stroke="#ffe94d" stroke-width="2" fill="none"/></g>
-      <path d="M-6 0 l7 -22 l7 22 z M72 0 l7 -22 l7 22 z" fill="#ff7a1a" stroke="#2a1508" stroke-width="1.5"/>
-      <path d="M-3 -9 h8 M75 -9 h8" stroke="#fff" stroke-width="2.5"/></g></svg>

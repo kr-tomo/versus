@@ -1,7 +1,7 @@
 // Precache the app shell and theme; serve cache first and refresh in the background.
-const CACHE = 'versus-v2';
+const CACHE = 'versus-v3';
 const THEME = 'themes/classic/';
-const CHARS = ['sword', 'spear', 'axe', 'dagger', 'fist'];
+const CHARS = ['sword', 'spear', 'axe', 'dagger', 'fist', 'stag', 'genghis'];
 const MAPS = ['lava', 'jungle', 'seoul', 'tundra'];
 const PRECACHE = [
   './', 'index.html', 'style.css', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-180.png',

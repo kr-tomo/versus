@@ -18,13 +18,14 @@
 <div id="safe"></div>
 <canvas id="view" hidden></canvas>
 <div id="controls" hidden></div>
-<button id="pauseBtn" hidden aria-label="일시정지"></button>
+<button id="pauseBtn" class="hud-btn" hidden aria-label="일시정지">❚❚</button>
+<button id="exitBtn" class="hud-btn" hidden aria-label="메뉴로 나가기">⌂</button>
 
 <section id="title" class="screen">
   <div class="title-art">
     <img src="themes/classic/portraits/sword.svg" alt="">
     <h1>VERSUS</h1>
-    <img src="themes/classic/portraits/axe.svg" alt="" class="flip">
+    <img src="themes/classic/portraits/genghis.svg" alt="" class="flip">
   </div>
   <p class="tagline">중세 무사 대전 격투</p>
   <div class="menu">
@@ -53,6 +54,12 @@
 <section id="pause" class="screen overlay" hidden>
   <h2>일시정지</h2>
   <div class="menu"><button id="resumeBtn">계속하기</button><button id="quitBtn">메뉴로</button></div>
+</section>
+
+<section id="confirm" class="screen overlay" hidden>
+  <h2>메뉴로 나갈까요?</h2>
+  <p class="tagline">진행 중인 대전은 저장되지 않습니다</p>
+  <div class="menu"><button id="confirmQuitBtn">나가기</button><button id="cancelQuitBtn">계속하기</button></div>
 </section>
 
 <section id="result" class="screen overlay" hidden>
