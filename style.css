@@ -16,7 +16,8 @@ body { position: fixed; inset: 0; }
 button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
 
 #safe { position: fixed; visibility: hidden; pointer-events: none; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
-#view { position: absolute; display: block; background: #000; }
+#stage { position: absolute; background: #000; pointer-events: none; overflow: hidden; }
+#stage canvas { display: block; width: 100% !important; height: 100% !important; }
 
 /* ---------- touch pads ---------- */
 #controls { position: absolute; inset: 0; pointer-events: none; }
@@ -114,6 +115,21 @@ footer .primary { background: linear-gradient(#ffcf6b, #ff9a1f); color: #2a1300;
 
 #result h2 { text-align: center; font-size: calc(var(--u) * 8); color: var(--accent); }
 #result h2 small { display: block; font-size: .4em; color: var(--text); margin-top: 6px; }
+/* ---------- gamepad / keyboard focus ---------- */
+body.nav .nav-focus { outline: 3px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(255,179,71,.55), 0 0 18px rgba(255,179,71,.6); position: relative; z-index: 1; }
+body.nav .menu button.nav-focus, body.nav footer button.nav-focus { transform: scale(1.04); }
+#hints {
+  position: fixed; left: 50%; bottom: max(env(safe-area-inset-bottom), 6px); transform: translateX(-50%); z-index: 20;
+  padding: 4px 14px; border-radius: 99px; background: rgba(0,0,0,.6); color: #e8e2f2; font-size: 12px; font-weight: 700; white-space: nowrap; pointer-events: none;
+}
+#fatal {
+  position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 50; width: min(92vw, 640px);
+  background: #2a0f14; border: 2px solid #ff5a5a; border-radius: 12px; padding: 10px 14px; color: #fff; font-size: 13px;
+}
+#fatal pre { margin: 6px 0; max-height: 30vh; overflow: auto; white-space: pre-wrap; font-size: 11px; color: #ffd0d0; -webkit-user-select: text; user-select: text; }
+#fatal div { display: flex; gap: 8px; }
+#fatal button { flex: 1; background: #3a1a20; border: 1px solid #ff8a8a; border-radius: 8px; padding: 8px; font-weight: 700; }
+#version { color: #6f6880; font-size: .7em; }
 #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; font-size: 18px; color: var(--muted); }
 
 /* portrait: stack the two pick columns */

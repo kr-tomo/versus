@@ -16,7 +16,7 @@
 </head>
 <body>
 <div id="safe"></div>
-<canvas id="view" hidden></canvas>
+<div id="stage" hidden></div>
 <div id="controls" hidden></div>
 <button id="pauseBtn" class="hud-btn" hidden aria-label="일시정지">❚❚</button>
 <button id="exitBtn" class="hud-btn" hidden aria-label="메뉴로 나가기">⌂</button>
@@ -27,7 +27,7 @@
     <h1>VERSUS</h1>
     <img src="themes/classic/portraits/genghis.svg" alt="" class="flip">
   </div>
-  <p class="tagline">중세 무사 대전 격투</p>
+  <p class="tagline">중세 무사 대전 격투 <small id="version"></small></p>
   <div class="menu">
     <button data-mode="2p">2인 대전</button>
     <button data-mode="easy">컴퓨터 · 쉬움</button>
@@ -47,6 +47,7 @@
   <footer>
     <button id="winsBtn" class="toggle"></button>
     <button id="timeBtn" class="toggle"></button>
+    <button id="soundBtn" class="toggle"></button>
     <button id="startBtn" class="primary">시작</button>
   </footer>
 </section>
@@ -67,7 +68,35 @@
   <div class="menu"><button id="againBtn">다시 하기</button><button id="menuBtn">메뉴로</button></div>
 </section>
 
-<div id="loading" hidden>불러오는 중…</div>
+<div id="hints" hidden></div>
+<div id="loading">불러오는 중…</div>
+<div id="fatal" hidden>
+  <b>문제가 생겼습니다</b>
+  <pre></pre>
+  <div><button id="fatalReload">앱 새로 받기</button><button id="fatalClose">닫기</button></div>
+</div>
+<script>
+// Load/boot failures are shown on screen instead of a silent freeze (tablets have no devtools).
+(function () {
+  var box = document.getElementById('fatal'), pre = box.querySelector('pre');
+  window.__fatal = function (msg) { box.hidden = false; pre.textContent += msg + '\n'; };
+  addEventListener('error', function (e) {
+    var t = e.target;
+    if (t && t !== window && (t.src || t.href)) window.__fatal('로드 실패: ' + (t.src || t.href));
+    else window.__fatal((e.message || 'error') + (e.filename ? ' @ ' + e.filename.split('/').pop() + ':' + e.lineno : ''));
+  }, true);
+  addEventListener('unhandledrejection', function (e) { var r = e.reason; window.__fatal('promise: ' + ((r && (r.stack || r.message)) || r)); });
+  setTimeout(function () { if (!window.versus) window.__fatal('15초 안에 시작하지 못했습니다'); }, 15000);
+  document.getElementById('fatalClose').onclick = function () { box.hidden = true; };
+  // drop the service worker and every cache, then load the app fresh from the server
+  document.getElementById('fatalReload').onclick = function () {
+    var jobs = [];
+    if (navigator.serviceWorker) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }));
+    if (window.caches) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }));
+    Promise.all(jobs).catch(function () {}).then(function () { location.reload(); });
+  };
+})();
+</script>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

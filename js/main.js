@@ -1,4 +1,4 @@
-import { WEAPONS, WEAPON_IDS, MAPS, MAP_IDS, WIN_OPTIONS, TIME_OPTIONS, MAX_POWER, MAX_REACH, SUPERS } from './config.js';
+import { WEAPONS, WEAPON_IDS, MAPS, MAP_IDS, WIN_OPTIONS, TIME_OPTIONS, MAX_POWER, MAX_REACH, SUPERS, APP_VERSION } from './config.js';
 import { computeLayout } from './layout.js';
 import { loadTheme } from './assets.js';
 import { InputManager } from './input.js';
@@ -190,7 +190,9 @@ function startGame() {
   show(null);
   onResize();
   const current = game;
-  stage.startFight({ game, theme, readInputs, onLoaded: () => { if (game === current) $('#loading').hidden = true; } });
+  try {
+    stage.startFight({ game, theme, readInputs, onLoaded: () => { if (game === current) $('#loading').hidden = true; } });
+  } catch (e) { $('#loading').hidden = true; report('startFight', e); }
 }
 
 function quitToMenu() { stage.stopFight(); game = null; paused = false; show('setup'); refreshSetup(); }
@@ -227,7 +229,7 @@ function onResize() {
   const layout = computeLayout(W, H, { players: input.players });
   const v = layout.view, dpr = Math.min(devicePixelRatio || 1, 3);
   Object.assign(stageEl.style, { left: `${il + v.x}px`, top: `${it + v.y}px`, width: `${v.w}px`, height: `${v.h}px` });
-  stage.resize(Math.round(v.w * dpr), Math.round(v.h * dpr));
+  try { stage.resize(Math.round(v.w * dpr), Math.round(v.h * dpr)); } catch (e) { report('resize', e); }
   controls.innerHTML = layout.buttons.map(b =>
     `<div class="pad p${b.player} a-${b.action}" data-player="${b.player}" data-action="${b.action}" style="left:${il + b.x - b.r}px;top:${it + b.y - b.r}px;width:${b.r * 2}px;height:${b.r * 2}px;font-size:${Math.round(b.r * (b.action === 'left' || b.action === 'right' ? 0.7 : 0.5))}px">${LABEL[b.action]}</div>`).join('');
   // pause and exit sit under the round timer, between the two super gauges
@@ -246,13 +248,15 @@ function updatePadUI() {
 /* ---------- loop: pads for the menus, match end ---------- */
 let last = 0;
 function frame(ts) {
+  requestAnimationFrame(frame);
   const dt = Math.min(0.1, (ts - last) / 1000 || 0);
   last = ts;
   input.pollPads();
   nav.poll(dt, input.pads());
   if (game && !paused && game.phase === 'matchEnd' && game.phaseT > 1.6 && !resultShown) showResult();
-  requestAnimationFrame(frame);
 }
+
+const report = (where, e) => { console.error(where, e); window.__fatal?.(`${where}: ${e?.stack || e}`); };
 
 /* ---------- platform ---------- */
 function preventZoom() {
@@ -273,13 +277,16 @@ async function enterFullscreen() {
 }
 
 async function boot() {
+  $('#version').textContent = APP_VERSION;
   stage = new Stage(stageEl);
   [theme] = await Promise.all([loadTheme('classic'), stage.ready]);
   stage.setMuted(!settings.sound);
   input = new InputManager();
   input.onPadsChanged = updatePadUI;
   input.bindTouch(controls);
+  // menus and pads come alive first, so a later failure can't leave the controller dead
   nav = new MenuNav(onNav);
+  requestAnimationFrame(frame);
   buildTitle();
   buildSetup();
   refreshSetup();
@@ -299,8 +306,16 @@ async function boot() {
   window.versus = { stage, get game() { return game; } }; // debugging handle
   show('title');
   onResize();
-  requestAnimationFrame(frame);
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  registerServiceWorker();
 }
 
-boot();
+// When an updated worker takes over, reload once so every file comes from the same version.
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator) || !location.protocol.startsWith('http')) return;
+  const sw = navigator.serviceWorker;
+  let reloading = false;
+  if (sw.controller) sw.addEventListener('controllerchange', () => { if (!reloading && !game) { reloading = true; location.reload(); } });
+  sw.register('sw.js').catch(e => console.warn('service worker', e));
+}
+
+boot().catch(e => { $('#loading').hidden = true; report('boot', e); });
