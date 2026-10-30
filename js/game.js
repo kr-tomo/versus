@@ -1,6 +1,9 @@
-import { MAPS, MAP_IDS, VIEW_W, WORLD_W, SPAWN_X, BODY_HALF_W, BODY_H } from './config.js';
+import {
+  MAPS, MAP_IDS, VIEW_W, WORLD_W, SPAWN_X, BODY_HALF_W, BODY_H,
+  HIT_CONFIRM, HITSTOP_BASE, HITSTOP_PER_DMG, HITSTOP_MAX, HITSTOP_GUARD
+} from './config.js';
 import { createFighter, stepFighter, NO_INPUT } from './fighter.js';
-import { resolveHits } from './combat.js';
+import { detectHits, confirmHit } from './combat.js';
 import { constrainCamera } from './camera.js';
 import { generateMap } from './mapgen.js';
 
@@ -42,13 +45,21 @@ export class Game {
     this.phaseT = 0;
     this.result = null;
     this.effects = [];
+    this.pending = [];
+    this.hitstop = 0;
   }
 
   get world() { return { platforms: this.layout.platforms, ice: this.map.ice }; }
 
   update(dt, inputs) {
-    this.phaseT += dt;
     this.t = (this.t || 0) + dt;
+    // impact freeze: the world holds still, effects keep animating
+    if (this.hitstop > 0) {
+      this.hitstop = Math.max(0, this.hitstop - dt);
+      this.effects = this.effects.filter(e => (e.t += dt) < (e.life ?? 0.6));
+      return;
+    }
+    this.phaseT += dt;
     const live = this.phase === 'fight';
     const [a, b] = this.fighters;
     const world = this.world;
@@ -76,9 +87,7 @@ export class Game {
     this.cam = constrainCamera(this.cam, a, b);
 
     if (live) {
-      for (const e of resolveHits(a, b, this.rand)) {
-        this.effects.push({ type: e.evaded ? 'miss' : e.guarded ? 'guard' : 'hit', big: e.super || e.damage >= 20, x: e.x, y: e.y, dmg: e.damage, t: 0 });
-      }
+      this.resolveContacts(dt);
       for (const f of this.fighters) this.applyTrap(f, dt);
       this.timeLeft = Math.max(0, this.timeLeft - dt);
       this.checkRoundEnd();
@@ -95,6 +104,26 @@ export class Game {
   }
 
   setPhase(p) { this.phase = p; this.phaseT = 0; }
+
+  // Contacts wait HIT_CONFIRM before applying: late guards count and near-simultaneous hits trade.
+  resolveContacts(dt) {
+    const [a, b] = this.fighters;
+    for (const c of detectHits(a, b)) this.pending.push({ ...c, wait: HIT_CONFIRM });
+    const due = [];
+    for (const p of this.pending) if ((p.wait -= dt) <= 0) due.push(p);
+    if (!due.length) return;
+    this.pending = this.pending.filter(p => p.wait > 0);
+    // a hit confirmed together with (or within the window of) one going the other way is a trade
+    const trade = due.length > 1 || this.pending.some(p => due.some(d => d.att === p.def));
+    for (const p of due) {
+      if (p.def.super || p.def.ko) continue;
+      const e = confirmHit(p, this.rand, { lateGuard: p.def.guarding });
+      const who = this.fighters.indexOf(p.def);
+      this.effects.push({ type: e.evaded ? 'miss' : e.guarded ? 'guard' : 'hit', who, big: e.super || e.damage >= 20, x: e.x, y: e.y, dmg: e.damage, dir: p.att.facing, t: 0 });
+      if (!e.evaded) this.hitstop = Math.max(this.hitstop, e.guarded ? HITSTOP_GUARD : Math.min(HITSTOP_MAX, HITSTOP_BASE + e.damage * HITSTOP_PER_DMG));
+    }
+    if (trade && due.length) this.effects.push({ type: 'trade', x: (a.x + b.x) / 2, y: Math.min(a.y, b.y) - 100, t: 0, life: 0.9 });
+  }
 
   applyTrap(f, dt) {
     const onTrap = f.onGround && f.platform < 0 && this.layout.traps.some(t => f.x > t.x + 4 && f.x < t.x + t.w - 4);

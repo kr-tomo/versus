@@ -34,9 +34,10 @@ const gain = (f, n) => { f.meter = Math.min(SUPER_MAX, f.meter + n); };
 // Normal attacks: guard reduces damage to 1 and knockback to 1/5.
 // Supers: guard takes 1/4 chip unless the hit ignores (ub) or crushes the guard.
 // Airborne defenders dodge with AIR_EVADE chance. Being hit charges the super gauge.
-export function applyHit(att, def, s = strike(att) ?? { dmg: att.stats.power, kb: att.stats.power * KNOCKBACK_PER_DMG, stun: HIT_STUN }, rand = Math.random) {
+// lateGuard: the defender is holding guard when the hit is confirmed (counts even if not fully up).
+export function applyHit(att, def, s = strike(att) ?? { dmg: att.stats.power, kb: att.stats.power * KNOCKBACK_PER_DMG, stun: HIT_STUN }, rand = Math.random, { lateGuard = false } = {}) {
   if (!def.onGround && rand() < AIR_EVADE) return { evaded: true, guarded: false, damage: 0 };
-  const guarded = def.guard && !s.ub;
+  const guarded = (def.guard || lateGuard) && !s.ub;
   const firstOfSuper = !s.super || s.index === 0;
   let damage = s.dmg, kb = s.kb;
   if (guarded) {
@@ -56,21 +57,23 @@ export function applyHit(att, def, s = strike(att) ?? { dmg: att.stats.power, kb
   return { evaded: false, guarded, damage };
 }
 
-// Both hitboxes are evaluated before applying, so simultaneous hits trade.
+// Contacts this frame. Each attack (or super hit window) connects once; it is marked used here.
 // A fighter running a super is invulnerable.
-export function resolveHits(a, b, rand = Math.random) {
+export function detectHits(a, b) {
   const connects = [[a, b], [b, a]].map(([att, def]) => {
     const s = strike(att), hb = hitbox(att, s);
-    return [att, def, s, hb];
-  }).filter(([, def, , hb]) => hb && !def.ko && !def.super && overlap(hb, hurtbox(def)));
-  for (const [att, , s] of connects) if (s.super) att.super.done.add(s.index); else att.attack.hit = true;
-  const events = [];
-  for (const [att, def, s, hb] of connects) {
-    const r = applyHit(att, def, s, rand);
-    events.push({
-      attacker: att, defender: def, ...r, super: s.super,
-      x: (Math.max(hb.x1, def.x - halfW(def)) + Math.min(hb.x2, def.x + halfW(def))) / 2, y: def.y - height(def) * 0.6
-    });
-  }
-  return events;
+    return { att, def, s, hb };
+  }).filter(({ def, hb }) => hb && !def.ko && !def.super && overlap(hb, hurtbox(def)));
+  for (const { att, s } of connects) if (s.super) att.super.done.add(s.index); else att.attack.hit = true;
+  return connects.map(c => ({ ...c, x: (Math.max(c.hb.x1, c.def.x - halfW(c.def)) + Math.min(c.hb.x2, c.def.x + halfW(c.def))) / 2 }));
+}
+
+export function confirmHit({ att, def, s, x }, rand = Math.random, opts) {
+  const r = applyHit(att, def, s, rand, opts);
+  return { attacker: att, defender: def, ...r, super: s.super, x, y: def.y - height(def) * 0.6 };
+}
+
+// Immediate resolution: both hitboxes are evaluated before applying, so same-frame hits trade.
+export function resolveHits(a, b, rand = Math.random) {
+  return detectHits(a, b).map(c => confirmHit(c, rand));
 }

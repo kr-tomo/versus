@@ -41,6 +41,13 @@ export const MAX_POWER = Math.max(...WEAPON_IDS.map(w => WEAPONS[w].power));
 export const MAX_REACH = Math.max(...WEAPON_IDS.map(w => WEAPONS[w].reach));
 
 export const GUARD_MOVE = 0.35;        // walking speed ratio while guarding
+// A contact is confirmed HIT_CONFIRM seconds later. Inside that window the defender can still
+// guard (any raise counts) and can still land its own hit — both hits go through (trade).
+export const HIT_CONFIRM = 0.05;
+export const HITSTOP_BASE = 0.035;     // freeze on impact: base + per damage, capped
+export const HITSTOP_PER_DMG = 0.0025;
+export const HITSTOP_MAX = 0.12;
+export const HITSTOP_GUARD = 0.03;
 export const JUMP_ATTACK_MULT = 1.5;   // aerial attacks hit harder
 export const AIR_EVADE = 1 / 3;        // chance an airborne fighter dodges a hit
 
