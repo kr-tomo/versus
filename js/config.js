@@ -1,7 +1,7 @@
 // Gameplay constants. Visuals live in themes/<id>/theme.json.
 
 // Shown on the title screen; keep in step with CACHE in sw.js.
-export const APP_VERSION = 'v5';
+export const APP_VERSION = 'v6';
 
 export const WORLD_W = 1280;
 export const VIEW_W = 640;
@@ -42,8 +42,27 @@ export const WEAPONS = {
 export const WEAPON_IDS = Object.keys(WEAPONS);
 export const MAX_POWER = Math.max(...WEAPON_IDS.map(w => WEAPONS[w].power));
 export const MAX_REACH = Math.max(...WEAPON_IDS.map(w => WEAPONS[w].reach));
+export const canDoubleJump = w => WEAPONS[w].reach <= MAX_REACH / 2;
 
 export const GUARD_MOVE = 0.35;        // walking speed ratio while guarding
+
+// Attack variations (ground):
+//   long  — attacking while walking forward: 1.2x slower, reach + LONG_REACH_BONUS for everyone,
+//           and the fighter keeps stepping forward (that movement is on top of the bonus).
+//           Bonus = half the average walking stride (37.9px measured from the rig's walk poses).
+//   heavy — long-reach fighters attacking while walking backward: reach x HEAVY_REACH, same damage,
+//           and super armor: hits still deal damage but cause no knockback/stun and don't cancel it.
+export const LONG_ATTACK_SLOW = 1.2;
+export const LONG_REACH_BONUS = 19;
+export const HEAVY_REACH = 0.8;
+export const HEAVY_MOVE = 0.35;        // backstep speed ratio during a heavy attack
+// Short-reach fighters (reach <= half of the longest reach) get a double jump.
+// Attacking during it dives 45° into the ground with aerial-attack damage.
+export const DOUBLE_JUMP_V = 640;
+export const FLIP_TIME = 0.42;         // somersault on the double jump
+export const DIVE_SPEED = 620;
+export const DIVE_REACH = 34;
+export const DIVE_LAND_RECOVERY = 0.18;
 // A contact is confirmed HIT_CONFIRM seconds later. Inside that window the defender can still
 // guard (any raise counts) and can still land its own hit — both hits go through (trade).
 export const HIT_CONFIRM = 0.05;

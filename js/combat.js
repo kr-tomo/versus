@@ -1,6 +1,7 @@
 import {
   BODY_HALF_W, BODY_H, KNOCKBACK_PER_DMG, GUARD_KNOCKBACK_RATIO, GUARD_DAMAGE, HIT_STUN,
-  JUMP_ATTACK_MULT, AIR_EVADE, SUPER_MAX, SUPER_GAIN_HIT, SUPER_GAIN_GUARD
+  JUMP_ATTACK_MULT, AIR_EVADE, SUPER_MAX, SUPER_GAIN_HIT, SUPER_GAIN_GUARD,
+  LONG_REACH_BONUS, HEAVY_REACH, DIVE_REACH
 } from './config.js';
 import { attackPhase, superHit } from './fighter.js';
 
@@ -12,15 +13,17 @@ export function strike(f) {
   const sh = superHit(f);
   if (sh) return { ...sh, super: true };
   if (attackPhase(f) !== 'active' || f.attack.hit) return null;
-  const aerial = f.attack.aerial;
+  const { aerial, kind } = f.attack;
   const dmg = aerial ? Math.round(f.stats.power * JUMP_ATTACK_MULT) : f.stats.power;
-  return { reach: f.stats.reach, dmg, kb: dmg * KNOCKBACK_PER_DMG, stun: HIT_STUN, aerial, super: false };
+  const reach = kind === 'long' ? f.stats.reach + LONG_REACH_BONUS : kind === 'heavy' ? f.stats.reach * HEAVY_REACH : kind === 'dive' ? DIVE_REACH : f.stats.reach;
+  return { reach, dmg, kb: dmg * KNOCKBACK_PER_DMG, stun: HIT_STUN, aerial, kind, super: false };
 }
 
 export function hitbox(f, s = strike(f)) {
   if (!s) return null;
   const h = height(f), front = f.x + f.facing * halfW(f), tip = front + f.facing * s.reach;
-  const [y1, y2] = s.aerial ? [f.y - h * 0.85, f.y + 12] : [f.y - h * 0.95, f.y - h * 0.25];
+  // a dive leads with the feet / blade: the box sits low and reaches below the body
+  const [y1, y2] = s.kind === 'dive' ? [f.y - h * 0.55, f.y + 22] : s.aerial ? [f.y - h * 0.85, f.y + 12] : [f.y - h * 0.95, f.y - h * 0.25];
   return { x1: Math.min(front, tip), x2: Math.max(front, tip), y1, y2 };
 }
 
@@ -35,6 +38,8 @@ const gain = (f, n) => { f.meter = Math.min(SUPER_MAX, f.meter + n); };
 // Supers: guard takes 1/4 chip unless the hit ignores (ub) or crushes the guard.
 // Airborne defenders dodge with AIR_EVADE chance. Being hit charges the super gauge.
 // lateGuard: the defender is holding guard when the hit is confirmed (counts even if not fully up).
+// Heavy-attack armor: a defender in a heavy attack takes the damage but no knockback or stun and
+// keeps swinging (supers still break through).
 export function applyHit(att, def, s = strike(att) ?? { dmg: att.stats.power, kb: att.stats.power * KNOCKBACK_PER_DMG, stun: HIT_STUN }, rand = Math.random, { lateGuard = false } = {}) {
   if (!def.onGround && rand() < AIR_EVADE) return { evaded: true, guarded: false, damage: 0 };
   const guarded = (def.guard || lateGuard) && !s.ub;
@@ -45,6 +50,11 @@ export function applyHit(att, def, s = strike(att) ?? { dmg: att.stats.power, kb
     kb *= GUARD_KNOCKBACK_RATIO;
   }
   def.energy = Math.max(0, def.energy - damage);
+  if (def.attack?.kind === 'heavy' && !s.super && !guarded) {
+    def.hitFlash = 0.2;
+    gain(def, SUPER_GAIN_HIT);
+    return { evaded: false, guarded, damage, armored: true };
+  }
   def.kb = kb;
   def.kbDir = att.facing;
   if (!guarded || s.crush) {

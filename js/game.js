@@ -119,7 +119,7 @@ export class Game {
       if (p.def.super || p.def.ko) continue;
       const e = confirmHit(p, this.rand, { lateGuard: p.def.guarding });
       const who = this.fighters.indexOf(p.def);
-      this.effects.push({ type: e.evaded ? 'miss' : e.guarded ? 'guard' : 'hit', who, big: e.super || e.damage >= 20, x: e.x, y: e.y, dmg: e.damage, dir: p.att.facing, t: 0 });
+      this.effects.push({ type: e.evaded ? 'miss' : e.guarded ? 'guard' : e.armored ? 'armor' : 'hit', who, big: e.super || e.damage >= 20, x: e.x, y: e.y, dmg: e.damage, dir: p.att.facing, t: 0 });
       if (!e.evaded) this.hitstop = Math.max(this.hitstop, e.guarded ? HITSTOP_GUARD : Math.min(HITSTOP_MAX, HITSTOP_BASE + e.damage * HITSTOP_PER_DMG));
     }
     if (trade && due.length) this.effects.push({ type: 'trade', x: (a.x + b.x) / 2, y: Math.min(a.y, b.y) - 100, t: 0, life: 0.9 });

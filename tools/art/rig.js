@@ -83,8 +83,40 @@ export const POSES = {
   hit:     { lean: -22,tilt: -15, fTh: 15, fSh: -10, bTh: -35, bSh: -20, fUp: -40, fFo: -10, bUp: -60, bFo: -40, w: -150, wB: -150 },
   win:     { lean: -4, tilt: -6,  fTh: 20, fSh: 0,   bTh: -20, bSh: -10, fUp: 170, fFo: 175, bUp: 20,  bFo: 40,  w: -90,  wB: -60 }
 };
-export const FRAMES = Object.keys(POSES);
 const LEG_KEYS = ['fTh', 'fSh', 'bTh', 'bSh', 'lean', 'tilt'];
+
+// Key poses for the attack variations, built from each character's own poses so weapon-specific
+// grips carry over: from = [poseA, poseB, mix], then `add` offsets and `set` absolute values.
+const DERIVED = {
+  longWind:  { from: ['idle0', 'windup', 0.55], add: { lean: -4, fTh: -6, bTh: -8 } },
+  longAtk:   { from: ['attack', 'attack', 0], add: { lean: 10, fTh: 20, fSh: 10, bTh: -18, bSh: -14 } },
+  heavyWind: { from: ['windup', 'windup', 0], add: { lean: -10, tilt: -5, fUp: 12, w: -20, fTh: 4, bTh: -4 } },
+  heavyAtk:  { from: ['attack', 'attack', 0], add: { lean: 10, tilt: 8, fUp: 14, w: 42, wB: 30 }, set: { fTh: 62, fSh: 18, bTh: -46, bSh: -58 } },
+  flip:      { from: ['jump', 'jump', 0], add: { lean: 12 }, set: { fTh: 115, fSh: 10, bTh: 95, bSh: -10, fUp: 100, fFo: 40, bUp: 80, bFo: 20 } },
+  dive:      { from: ['jumpAtk', 'jumpAtk', 0], add: { lean: 24, w: 30, wB: 30 }, set: { fTh: -15, fSh: -55, bTh: -40, bSh: -85 } }
+};
+
+// Sprite frames: key poses plus in-betweens [name, from, to, mix] — twice the old frame count.
+const FRAME_DEFS = [
+  ['idle0'], ['idle01', 'idle0', 'idle1', 0.5], ['idle1'], ['idle10', 'idle1', 'idle0', 0.5],
+  ['walk0'], ['walk01', 'walk0', 'walk1', 0.5], ['walk1'], ['walk12', 'walk1', 'walk2', 0.5],
+  ['walk2'], ['walk23', 'walk2', 'walk3', 0.5], ['walk3'], ['walk30', 'walk3', 'walk0', 0.5],
+  ['windup0', 'idle0', 'windup', 0.5], ['windup'], ['attack'], ['attack1', 'attack', 'idle0', 0.5],
+  ['guard0', 'idle0', 'guard', 0.5], ['guard'], ['airGuard'],
+  ['jump'], ['apex', 'jump', 'fall', 0.5], ['fall'], ['jumpAtk0', 'jump', 'jumpAtk', 0.5], ['jumpAtk'],
+  ['hit'], ['hit0', 'hit', 'idle0', 0.5], ['win'], ['win0', 'win', 'idle0', 0.35],
+  ['longWind'], ['longAtk0', 'longWind', 'longAtk', 0.5], ['longAtk'],
+  ['heavyWind'], ['heavyAtk0', 'heavyWind', 'heavyAtk', 0.5], ['heavyAtk'],
+  ['flip'], ['dive']
+];
+const FRAME_BY_NAME = Object.fromEntries(FRAME_DEFS.map(d => [d[0], d]));
+export const FRAMES = FRAME_DEFS.map(d => d[0]);
+
+const mix = (a, b, t) => {
+  const o = { ...a };
+  for (const k of Object.keys(b)) if (typeof b[k] === 'number' && typeof a[k] === 'number') o[k] = a[k] + (b[k] - a[k]) * t;
+  return o;
+};
 const SEATED = { fTh: 62, fSh: 8, bTh: 50, bSh: 0 };
 
 /* ---------- horse (feet at y=0, facing +x) ---------- */
@@ -172,7 +204,9 @@ export const CHARS = [
     accent: '#c8642a', skin: '#e3b48f', body: '#5d6e3b', sleeve: '#e3b48f', fore: '#6b4a2e', pants: '#6b5a48', shin: '#9b8a6e', cape: '#7a5c3c',
     poses: {
       idle0: { w: -75, fUp: 15, fFo: 120 }, windup: { fUp: 170, fFo: 215, w: -175, lean: -8 }, attack: { fUp: 110, fFo: 80, w: 25, lean: 24 },
-      guard: { w: -100 }, jumpAtk: { w: 60, fUp: 120, fFo: 60 }, win: { w: -70 }
+      guard: { w: -100 }, jumpAtk: { w: 60, fUp: 120, fFo: 60 }, win: { w: -70 },
+      // axe dive: overhead chop driven down at 45°
+      dive: { lean: 30, fUp: 115, fFo: 85, w: 62, fTh: -10, fSh: -50, bTh: -35, bSh: -80 }
     },
     torso: c => `<path d="M-10 0 L10 0 L12 11 L-12 11 Z" fill="${c.body}" stroke="${OL}" stroke-width="2.5" stroke-linejoin="round"/>
       <path d="M-11 1 L11 1 L13 -27 Q0 -34 -13 -27 Z" fill="${c.body}" stroke="${OL}" stroke-width="3" stroke-linejoin="round"/>
@@ -192,7 +226,9 @@ export const CHARS = [
     poses: {
       idle0: { w: 15, wB: 25, fUp: 45, fFo: 95, bUp: 35, bFo: 85 }, windup: { fUp: 60, fFo: 60, w: -10, wB: 20, lean: 10, bUp: 30, bFo: 90 },
       attack: { fUp: 100, fFo: 100, w: 5, lean: 26, fTh: 62, bTh: -45 },
-      guard: { w: -115, wB: -65 }, airGuard: { w: -115, wB: -65 }, jumpAtk: { w: 45, wB: 50 }, win: { w: -90, wB: -20 }
+      guard: { w: -115, wB: -65 }, airGuard: { w: -115, wB: -65 }, jumpAtk: { w: 45, wB: 50 }, win: { w: -90, wB: -20 },
+      // blade dive: both daggers point 45° down-forward, body stretched behind them
+      dive: { lean: 36, fUp: 75, fFo: 65, bUp: 65, bFo: 55, w: 18, wB: 22, fTh: -20, fSh: -60, bTh: -42, bSh: -88 }
     },
     torso: c => `<path d="M-10 0 L10 0 L15 16 L-12 16 Z" fill="${c.body}" stroke="${OL}" stroke-width="2.5" stroke-linejoin="round"/>
       <path d="M-10 1 L10 1 L12 -27 Q0 -33 -12 -27 Z" fill="${c.body}" stroke="${OL}" stroke-width="3" stroke-linejoin="round"/>
@@ -213,7 +249,9 @@ export const CHARS = [
       guard: { fUp: 20, fFo: 170, bUp: 25, bFo: 165 }, airGuard: { fUp: 20, fFo: 170, bUp: 25, bFo: 165 },
       jump: { fUp: 120, fFo: 170, bUp: -30, bFo: 30 }, fall: { fUp: 60, fFo: 140, bUp: -40, bFo: 20 },
       jumpAtk: { lean: -8, fTh: 100, fSh: 95, bTh: -10, bSh: -70, fUp: 40, fFo: 150, bUp: -50, bFo: -20 },
-      win: { fUp: 175, fFo: 180, bUp: 40, bFo: 150 }
+      win: { fUp: 175, fFo: 180, bUp: 40, bFo: 150 },
+      // flying kick: lead leg locked 45° down-forward, rear leg tucked, fists up
+      dive: { lean: -14, tilt: -6, fTh: 48, fSh: 46, bTh: 105, bSh: -15, fUp: 40, fFo: 150, bUp: 25, bFo: 140 }
     },
     torso: c => { let beads = ''; for (let i = 0; i < 7; i++) { const a = (-150 + i * 22) * Math.PI / 180; beads += `<circle cx="${f(Math.cos(a) * 9)}" cy="${f(-24 + Math.sin(a) * -7)}" r="1.8" fill="#6b3a1e" stroke="${OL}" stroke-width=".8"/>`; }
       return `<path d="M-10 0 L10 0 L12 9 L-12 9 Z" fill="${c.body}" stroke="${OL}" stroke-width="2.5" stroke-linejoin="round"/>
@@ -280,6 +318,14 @@ export const CHARS = [
 
 function poseFor(c, name) {
   const ov = c.poses || {};
+  const d = FRAME_BY_NAME[name];
+  if (d && d.length > 1) return mix(poseFor(c, d[1]), poseFor(c, d[2]), d[3]);
+  if (DERIVED[name]) {
+    const { from: [a, b, t], add = {}, set = {} } = DERIVED[name];
+    const p = mix(poseFor(c, a), poseFor(c, b), t);
+    for (const [k, v] of Object.entries(add)) p[k] = (p[k] ?? 0) + v;
+    return Object.assign(p, set, c.mount ? SEATED : {}, ov[name] || {});
+  }
   const p = Object.assign({ jaw: 16 }, POSES[name], c.mount ? SEATED : {});
   // idle arm/weapon overrides carry over to the idle bob and walk cycle
   if (name !== 'idle0' && (name.startsWith('idle') || name.startsWith('walk')) && ov.idle0) {

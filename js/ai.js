@@ -1,4 +1,4 @@
-import { BODY_HALF_W, SUPER_MAX, SUPERS } from './config.js';
+import { BODY_HALF_W, SUPER_MAX, SUPERS, LONG_REACH_BONUS, HEAVY_REACH } from './config.js';
 import { attackPhase } from './fighter.js';
 
 // guard: chance to notice an incoming attack; guardLag: extra delay before raising the guard
@@ -61,6 +61,12 @@ export class AI {
     // full gauge and in range: fire the super
     if (me.meter >= SUPER_MAX && me.onGround && !me.attack && gap <= SUPERS[me.weapon].range && r() < p.superUse) { this.charging = true; return; }
 
+    if (!me.attack && me.onGround) {
+      // long-reach fighters crowded up close: back off with an armored heavy swing
+      if (!me.canDouble && gap <= myReach * HEAVY_REACH * 0.8 && gap < myReach * 0.5 && r() < p.attack * 0.35) { inp.attack = true; move(-dir); return; }
+      // just out of normal reach: step in with a long attack
+      if (gap > myReach * 0.9 && gap <= myReach + LONG_REACH_BONUS + 10 && r() < p.attack * 0.5) { inp.attack = true; move(dir); return; }
+    }
     // punish recovery or attack when in range
     if (gap <= myReach * 0.9 && !me.attack) {
       if ((p.punish && opPhase === 'recovery') || r() < p.attack) { inp.attack = true; return; }
@@ -85,7 +91,11 @@ export class AI {
     // opponent above on a platform → follow; occasional jump attack
     if (me.onGround && op.y < me.y - 40 && Math.abs(op.x - me.x) < 120) inp.jump = true;
     else if (me.onGround && r() < p.jump) inp.jump = true;
-    if (!me.onGround && gap < myReach && r() < p.attack * 0.6) inp.attack = true;
+    if (!me.onGround && me.canDouble && !me.doubled && me.vy > -200 && r() < p.jump * 3) inp.jump = true;
+    // after a double jump: dive when the opponent sits roughly on the 45° line ahead
+    const dx = (op.x - me.x) * me.facing, dy = op.y - me.y;
+    if (me.doubled && !me.attack && dx > 0 && Math.abs(dx - dy) < 70 && r() < p.attack) inp.attack = true;
+    else if (!me.onGround && !me.doubled && gap < myReach && r() < p.attack * 0.6) inp.attack = true;
     // drop down to chase an opponent on the ground
     if (me.platform >= 0 && op.y > me.y + 40 && r() < 0.5) inp.down = true;
   }

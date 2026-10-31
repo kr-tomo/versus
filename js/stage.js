@@ -2,7 +2,7 @@
 // Game rules stay in game.js; this module only reads the state and draws it,
 // adding engine-side effects (particles, Arcade-physics debris, camera FX, filters, sound).
 import * as Phaser from '../vendor/phaser-4.2.1.esm.min.js';
-import { VIEW_W, VIEW_H, WORLD_W, GROUND_Y, PARALLAX, MAX_ENERGY, SUPER_MAX, SUPER_HOLD, BODY_HALF_W, BODY_H } from './config.js';
+import { VIEW_W, VIEW_H, WORLD_W, GROUND_Y, PARALLAX, MAX_ENERGY, SUPER_MAX, SUPER_HOLD, BODY_HALF_W, BODY_H, FLIP_TIME } from './config.js';
 import { frameName } from './fighter.js';
 import { loadImage, rasterize } from './assets.js';
 import { INTRO_TIME } from './game.js';
@@ -16,6 +16,9 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const quant = v => Math.floor(v * 4) / 4;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const halfW = f => f.stats.halfW ?? BODY_HALF_W;
+const ease = t => t * t * (3 - 2 * t);
+const CLOSE_ZOOM = 0.45;              // super close-up: extra zoom at full focus
+const FOCUS_IN = 0.22, FOCUS_OUT = 0.45; // seconds to zoom in / back out
 const height = f => f.stats.height ?? BODY_H;
 
 // per-map tint for dust and debris, and the trap splash color
@@ -81,11 +84,14 @@ class FightScene extends Phaser.Scene {
     Object.assign(this, { model: data.game, theme: data.theme, readInputs: data.readInputs, onLoaded: data.onLoaded });
     this.ready = false; this.acc = 0; this.slowT = 0; this.round = -1;
     this.seen = new WeakSet(); this.texts = []; this.prev = [{}, {}]; this.trapT = [0, 0];
+    this.focus = 0; this.focusAt = null;
   }
 
   create() {
     const cam = this.cameras.main;
     cam.setOrigin(0, 0).setBackgroundColor('#000');
+    // HUD gets its own camera so the super close-up zooms the world only
+    this.hudCam = this.cameras.add(0, 0, this.scale.width, this.scale.height).setOrigin(0, 0);
     this.fitCamera();
     this.scale.on('resize', this.fitCamera, this);
     this.events.once('shutdown', () => { this.scale.off('resize', this.fitCamera, this); this.sound.stopByKey?.('charge'); });
@@ -95,8 +101,19 @@ class FightScene extends Phaser.Scene {
 
   fitCamera() {
     const z = this.scale.width / VIEW_W;
-    this.cameras.main.setZoom(z);
+    this.baseZoom = z;
+    this.cameras.main.setSize(this.scale.width, this.scale.height).setZoom(z);
+    this.hudCam?.setSize(this.scale.width, this.scale.height).setZoom(z);
     for (const t of this.texts) t.setResolution(Math.min(3, z));
+  }
+
+  // Each object is drawn by exactly one camera: HUD objects (scrollFactor 0) by hudCam, the rest by main.
+  sortCameras() {
+    for (const o of this.children.list) {
+      if (o.camSorted) continue;
+      o.camSorted = true;
+      if (o.scrollFactorX === 0) this.cameras.main.ignore(o); else this.hudCam.ignore(o);
+    }
   }
 
   // Rasterize SVG sheets at the screen scale (capped to the GPU texture limit) and cut frames.
@@ -193,6 +210,9 @@ class FightScene extends Phaser.Scene {
     this.bannerSub.y = VIEW_H * 0.42 + 38;
     this.superBar = this.add.graphics().setScrollFactor(0).setDepth(1000);
     this.vignette = this.add.image(0, 0, 'fx-vignette').setOrigin(0).setDisplaySize(VIEW_W, VIEW_H).setScrollFactor(0).setDepth(900).setAlpha(0);
+    // super focus: the stage dims behind the fighters and cinema bars slide in
+    this.dim = this.add.rectangle(-200, -400, WORLD_W + 400, VIEW_H + 800, 0x05030a).setOrigin(0).setDepth(8.9).setAlpha(0);
+    this.bars = [0, 1].map(i => this.add.rectangle(0, i ? VIEW_H : 0, VIEW_W, 0, 0x000000).setOrigin(0, i).setScrollFactor(0).setDepth(950));
     this.fitCamera();
   }
 
@@ -271,6 +291,14 @@ class FightScene extends Phaser.Scene {
         this.popText(`-${e.dmg}`, e.x, e.y - 18, '#bfe6ff', 14);
         cam.shake(70, 0.003);
         this.sfx('guard', { volume: 0.7 });
+      } else if (e.type === 'armor') {
+        // heavy-attack armor: damage lands, the fighter doesn't budge
+        this.fx.spark.explode(8, e.x, e.y);
+        this.ring(e.x, e.y, 0xffa040, 1.2);
+        this.popText(`-${e.dmg}`, e.x, e.y - 18, '#ffb347', 16);
+        this.popText('버팀!', e.x, e.y - 44, '#ffd27a', 13);
+        cam.shake(90, 0.004);
+        this.sfx('guard', { volume: 0.6, rate: 0.7 });
       } else if (e.type === 'miss') {
         this.popText('회피!', e.x, e.y - 18, '#9ef0ff', 16);
         this.sfx('miss', { volume: 0.7 });
@@ -281,6 +309,7 @@ class FightScene extends Phaser.Scene {
       } else if (e.type === 'super') {
         const f = g.fighters[e.who];
         cam.flash(180, 255, 240, 200);
+        this.slowT = Math.max(this.slowT, 0.22); // a beat of slow motion as the close-up lands
         this.ring(f.x, f.y - height(f) / 2, 0xffd05a, 2.4);
         this.fx.dust.explode(14, f.x, f.y);
         this.pulseVignette();
@@ -299,6 +328,13 @@ class FightScene extends Phaser.Scene {
       const p = this.prev[i];
       if (f.attack && f.attack !== p.attack) this.sfx(f.stats.power >= 18 ? 'swingHeavy' : 'swing', { volume: 0.55, rate: rnd(0.92, 1.08) });
       if (p.onGround && !f.onGround && f.vy < 0) { this.fx.dust.explode(5, f.x, f.y); this.sfx('jump', { volume: 0.4 }); }
+      if (f.doubled && !p.doubled) { this.ring(f.x, f.y, 0xffffff, 0.8); this.sfx('jump', { volume: 0.4, rate: 1.3 }); }
+      if (f.attack?.kind === 'dive' && f.attack.landed !== undefined && p.diveLanded === undefined && p.attack === f.attack) {
+        this.fx.dust.explode(14, f.x, f.y);
+        this.spawnDebris(f.x + f.facing * 10, f.y - 4, 4, f.facing);
+        this.cameras.main.shake(120, 0.006);
+        this.sfx('land', { volume: 0.7, rate: 0.8 });
+      }
       if (p.onGround === false && f.onGround) {
         this.fx.dust.explode(p.vy > 600 ? 10 : 5, f.x, f.y);
         this.sfx('land', { volume: 0.45 });
@@ -321,7 +357,7 @@ class FightScene extends Phaser.Scene {
       }
       // super dash: dust trail from the feet
       if (f.super && f.onGround && Math.abs(f.vx) > 150 && Math.random() < 0.5) this.fx.dust.explode(2, f.x - f.facing * 10, f.y);
-      Object.assign(p, { attack: f.attack, onGround: f.onGround, vy: f.vy, charge: f.charge, ko: f.ko });
+      Object.assign(p, { attack: f.attack, onGround: f.onGround, vy: f.vy, charge: f.charge, ko: f.ko, doubled: f.doubled, diveLanded: f.attack?.landed });
     });
 
     if (g.phase !== this.lastPhase) {
@@ -370,9 +406,9 @@ class FightScene extends Phaser.Scene {
   }
 
   /* ---------- per-frame sync ---------- */
-  sync() {
+  sync(dt) {
     const g = this.model, cam = this.cameras.main;
-    cam.scrollX = g.cam;
+    this.updateFocus(dt);
     const tf = Math.floor(g.t * 3) % 2;
     for (const s of this.traps || []) s.setFrame(`f${tf}`);
 
@@ -383,10 +419,15 @@ class FightScene extends Phaser.Scene {
       const v = this.fighters[i], c = v.c, sx = f.facing * c.scale / v.k, sy = c.scale / v.k;
       const frame = frameName(f);
       v.sprite.setFrame(frame).setScale(sx, sy).setDepth(f.attack || f.super ? 11 : 10);
+      const ox = c.origin[0] / c.cell[0], oy = c.origin[1] / c.cell[1];
       if (f.ko) {
         const r = Math.min(1, (f.t - f.koAt) * 4);
-        v.sprite.setPosition(f.x - f.facing * 6, f.y - 10).setRotation(-f.facing * Math.PI / 2 * r);
-      } else v.sprite.setPosition(f.x, f.y).setRotation(0);
+        v.sprite.setOrigin(ox, oy).setPosition(f.x - f.facing * 6, f.y - 10).setRotation(-f.facing * Math.PI / 2 * r);
+      } else if (frame === 'flip') {
+        // somersault around the body center
+        const h = height(f), r = ease(Math.min(1, f.flipT / FLIP_TIME));
+        v.sprite.setOrigin(ox, (c.origin[1] - h / 2 / c.scale) / c.cell[1]).setPosition(f.x, f.y - h / 2).setRotation(f.facing * Math.PI * 2 * r);
+      } else v.sprite.setOrigin(ox, oy).setPosition(f.x, f.y).setRotation(0);
       // hit flash: solid white for a moment, then blink
       if (f.hitFlash > 0.14) v.sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL).setAlpha(1);
       else {
@@ -410,6 +451,23 @@ class FightScene extends Phaser.Scene {
       if (f.charge > 0) v.charge.emitParticle(2);
     });
     this.drawHud();
+    this.sortCameras();
+  }
+
+  // Super close-up: zoom on the user, dim the stage and slide in cinema bars; ease back after.
+  updateFocus(dt) {
+    const g = this.model, cam = this.cameras.main, user = g.fighters.find(f => f.super);
+    if (user) this.focusAt = { x: user.x + user.facing * 40, y: user.y - height(user) / 2 - 10 };
+    this.focus = clamp(this.focus + (user ? dt / FOCUS_IN : -dt / FOCUS_OUT), 0, 1);
+    const e = ease(this.focus), Z = 1 + CLOSE_ZOOM * e;
+    cam.setZoom(this.baseZoom * Z);
+    if (e > 0 && this.focusAt) {
+      const w = VIEW_W / Z, h = VIEW_H / Z;
+      cam.scrollX = clamp(g.cam + (this.focusAt.x - w / 2 - g.cam) * e, 0, WORLD_W - w);
+      cam.scrollY = clamp((this.focusAt.y - h / 2) * e, 0, VIEW_H - h);
+    } else { cam.scrollX = g.cam; cam.scrollY = 0; }
+    this.dim.setAlpha(0.55 * e);
+    this.bars.forEach(b => b.setSize(VIEW_W, 26 * e));
   }
 
   surfaceBelow(f) {

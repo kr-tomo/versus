@@ -12,7 +12,7 @@ const out = join(root, 'themes/classic');
 const write = (rel, text) => { const p = join(out, rel); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, text); };
 const svg = (w, h, body, vb = `0 0 ${w} ${h}`) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${vb}">${body}</svg>\n`;
 
-const CELL = [220, 190], ORIGIN = [70, 180], COLS = 5;
+const CELL = [220, 190], ORIGIN = [70, 180], COLS = 6;
 const theme = { id: 'classic', name: '클래식', characters: {}, maps: {} };
 
 for (const c of CHARS) {
