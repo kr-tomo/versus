@@ -55,7 +55,9 @@
         "heavyAtk0": 32,
         "heavyAtk": 33,
         "flip": 34,
-        "dive": 35
+        "dive": 35,
+        "chargeHold": 36,
+        "airDash": 37
       }
     },
     "spear": {
@@ -111,7 +113,9 @@
         "heavyAtk0": 32,
         "heavyAtk": 33,
         "flip": 34,
-        "dive": 35
+        "dive": 35,
+        "chargeHold": 36,
+        "airDash": 37
       }
     },
     "axe": {
@@ -167,7 +171,9 @@
         "heavyAtk0": 32,
         "heavyAtk": 33,
         "flip": 34,
-        "dive": 35
+        "dive": 35,
+        "chargeHold": 36,
+        "airDash": 37
       }
     },
     "dagger": {
@@ -223,7 +229,9 @@
         "heavyAtk0": 32,
         "heavyAtk": 33,
         "flip": 34,
-        "dive": 35
+        "dive": 35,
+        "chargeHold": 36,
+        "airDash": 37
       }
     },
     "fist": {
@@ -279,7 +287,9 @@
         "heavyAtk0": 32,
         "heavyAtk": 33,
         "flip": 34,
-        "dive": 35
+        "dive": 35,
+        "chargeHold": 36,
+        "airDash": 37
       }
     },
     "stag": {
@@ -335,7 +345,9 @@
         "heavyAtk0": 32,
         "heavyAtk": 33,
         "flip": 34,
-        "dive": 35
+        "dive": 35,
+        "chargeHold": 36,
+        "airDash": 37
       }
     },
     "genghis": {
@@ -391,7 +403,125 @@
         "heavyAtk0": 32,
         "heavyAtk": 33,
         "flip": 34,
-        "dive": 35
+        "dive": 35,
+        "chargeHold": 36,
+        "airDash": 37
+      }
+    },
+    "mace": {
+      "name": "모르드레드",
+      "en": "Mordred",
+      "title": "중갑옷의 흑기사",
+      "color": "#6a1a22",
+      "sheet": "characters/mace.svg",
+      "portrait": "portraits/mace.svg",
+      "cell": [
+        220,
+        190
+      ],
+      "origin": [
+        70,
+        180
+      ],
+      "cols": 6,
+      "scale": 0.8,
+      "frames": {
+        "idle0": 0,
+        "idle01": 1,
+        "idle1": 2,
+        "idle10": 3,
+        "walk0": 4,
+        "walk01": 5,
+        "walk1": 6,
+        "walk12": 7,
+        "walk2": 8,
+        "walk23": 9,
+        "walk3": 10,
+        "walk30": 11,
+        "windup0": 12,
+        "windup": 13,
+        "attack": 14,
+        "attack1": 15,
+        "guard0": 16,
+        "guard": 17,
+        "airGuard": 18,
+        "jump": 19,
+        "apex": 20,
+        "fall": 21,
+        "jumpAtk0": 22,
+        "jumpAtk": 23,
+        "hit": 24,
+        "hit0": 25,
+        "win": 26,
+        "win0": 27,
+        "longWind": 28,
+        "longAtk0": 29,
+        "longAtk": 30,
+        "heavyWind": 31,
+        "heavyAtk0": 32,
+        "heavyAtk": 33,
+        "flip": 34,
+        "dive": 35,
+        "chargeHold": 36,
+        "airDash": 37
+      }
+    },
+    "fork": {
+      "name": "얀",
+      "en": "Jan",
+      "title": "네덜란드 농부",
+      "color": "#e08a1e",
+      "sheet": "characters/fork.svg",
+      "portrait": "portraits/fork.svg",
+      "cell": [
+        220,
+        190
+      ],
+      "origin": [
+        70,
+        180
+      ],
+      "cols": 6,
+      "scale": 0.8,
+      "frames": {
+        "idle0": 0,
+        "idle01": 1,
+        "idle1": 2,
+        "idle10": 3,
+        "walk0": 4,
+        "walk01": 5,
+        "walk1": 6,
+        "walk12": 7,
+        "walk2": 8,
+        "walk23": 9,
+        "walk3": 10,
+        "walk30": 11,
+        "windup0": 12,
+        "windup": 13,
+        "attack": 14,
+        "attack1": 15,
+        "guard0": 16,
+        "guard": 17,
+        "airGuard": 18,
+        "jump": 19,
+        "apex": 20,
+        "fall": 21,
+        "jumpAtk0": 22,
+        "jumpAtk": 23,
+        "hit": 24,
+        "hit0": 25,
+        "win": 26,
+        "win0": 27,
+        "longWind": 28,
+        "longAtk0": 29,
+        "longAtk": 30,
+        "heavyWind": 31,
+        "heavyAtk0": 32,
+        "heavyAtk": 33,
+        "flip": 34,
+        "dive": 35,
+        "chargeHold": 36,
+        "airDash": 37
       }
     }
   },
@@ -527,6 +657,21 @@
         ]
       },
       "extras": {}
+    }
+  },
+  "extras": {
+    "bull": {
+      "sheet": "extras/bull.svg",
+      "cell": [
+        180,
+        110
+      ],
+      "origin": [
+        80,
+        104
+      ],
+      "frames": 4,
+      "scale": 0.85
     }
   }
 }

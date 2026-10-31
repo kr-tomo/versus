@@ -1,7 +1,8 @@
 import {
   WEAPONS, SUPERS, MAX_ENERGY, GROUND_Y, GRAVITY, JUMP_V, WALK_SPEED, KNOCKBACK_SPEED,
   DROP_THROUGH_TIME, ICE_ACCEL, ICE_DECEL, GUARD_MOVE, SUPER_MAX, SUPER_HOLD, HIT_STUN,
-  LONG_ATTACK_SLOW, HEAVY_MOVE, DOUBLE_JUMP_V, FLIP_TIME, DIVE_SPEED, DIVE_LAND_RECOVERY, canDoubleJump
+  LONG_ATTACK_SLOW, HEAVY_MOVE, DOUBLE_JUMP_V, FLIP_TIME, DIVE_SPEED, DIVE_LAND_RECOVERY, canDoubleJump,
+  TURN_DELAY, CHARGE_TIME, AIR_DASH_DIST, AIR_DASH_TIME, AIR_DASH_ATTACK
 } from './config.js';
 
 export const NO_INPUT = Object.freeze({ left: false, right: false, jump: false, down: false, attack: false, guard: false });
@@ -11,7 +12,7 @@ export function createFighter(weapon, x, facing) {
     weapon, stats: WEAPONS[weapon], x, y: GROUND_Y, vx: 0, vy: 0, onGround: true, platform: -1, facing,
     energy: MAX_ENERGY, attack: null, guard: false, guarding: false, guardT: 0, stun: 0,
     meter: 0, charge: 0, super: null, kb: 0, kbDir: 0, drop: 0,
-    canDouble: canDoubleJump(weapon), doubled: false, flipT: 0,
+    canDouble: canDoubleJump(weapon), doubled: false, flipT: 0, airDash: null, wantFacing: facing, turnT: 0,
     trapAcc: 0, inTrap: false, hitFlash: 0, ko: false, won: false, prevInput: NO_INPUT, walk: 0, t: 0
   };
 }
@@ -22,6 +23,7 @@ export function attackTiming(f) {
   const s = f.stats, k = f.attack?.kind;
   if (k === 'long') return { startup: s.startup * LONG_ATTACK_SLOW, active: s.active * LONG_ATTACK_SLOW, recovery: s.recovery * LONG_ATTACK_SLOW };
   if (k === 'dive') return { startup: 0.05, active: Infinity, recovery: DIVE_LAND_RECOVERY };
+  if (k === 'charged') return { startup: CHARGE_TIME, active: s.active, recovery: s.recovery };
   return s;
 }
 
@@ -39,6 +41,10 @@ const attackOver = f => {
   const { startup, active, recovery } = attackTiming(f);
   return f.attack.t >= startup + active + recovery;
 };
+
+// Stag beetle air dash: level flight, untouchable, no attacks until the very end.
+export const dashing = f => !!f.airDash && f.airDash.t < AIR_DASH_TIME;
+const dashLocked = f => dashing(f) && f.airDash.t < AIR_DASH_TIME - AIR_DASH_ATTACK;
 
 // Current hit window of the running super, or null.
 export function superHit(f) {
@@ -65,11 +71,24 @@ export function stepFighter(f, input, dt, world) {
   if (f.ko) f.super = null;
   const canAct = f.stun <= 0 && !f.ko && !f.super;
 
+  // turning around after a cross-up is delayed; pressing attack or guard turns at once
+  if (f.wantFacing !== f.facing && !f.attack && !f.super && !f.ko && !dashing(f)) {
+    f.turnT += dt;
+    if (f.turnT >= TURN_DELAY || pressed('attack') || pressed('guard')) { f.facing = f.wantFacing; f.turnT = 0; }
+  } else f.turnT = 0;
+
   if (f.attack) {
     f.attack.t += dt;
-    if (attackOver(f)) f.attack = null;
+    if (!input.attack) f.attack.held = false;
+    if (f.attack.kind === 'charged' && f.attack.t < CHARGE_TIME && !input.attack) f.attack = null; // let go: charge cancelled
+    else if (attackOver(f)) {
+      // still holding attack after a ground swing → charge into a guard-breaking attack
+      const chain = f.attack.held && !input.guard && ['normal', 'long', 'heavy'].includes(f.attack.kind) && f.onGround && f.stun <= 0;
+      f.attack = chain ? { t: 0, kind: 'charged', aerial: false, hit: false } : null;
+    }
   }
   if (f.doubled && !f.onGround) f.flipT += dt;
+  if (f.airDash) { f.airDash.t += dt; if (f.onGround) f.airDash = null; }
   let dash = null;
   if (f.super) {
     f.super.t += dt;
@@ -91,16 +110,21 @@ export function stepFighter(f, input, dt, world) {
   }
 
   const held = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-  if (canAct && !f.attack && !input.guard && pressed('attack')) {
+  if (canAct && !f.attack && !input.guard && !dashLocked(f) && pressed('attack')) {
     let kind = 'normal';
-    if (!f.onGround) kind = f.doubled ? 'dive' : 'aerial';
+    if (!f.onGround) kind = f.doubled && f.canDouble ? 'dive' : 'aerial';
     else if (held === f.facing) kind = 'long';
     else if (held === -f.facing && !f.canDouble) kind = 'heavy';
-    f.attack = { t: 0, kind, aerial: !f.onGround, hit: false };
+    f.attack = { t: 0, kind, aerial: !f.onGround, hit: false, held: true };
   }
   if (canAct && !f.attack && f.onGround && pressed('jump')) { f.vy = -JUMP_V; f.onGround = false; f.platform = -1; }
   // double jump (short-reach fighters): a somersault in mid-air
   else if (canAct && !f.attack && !f.onGround && f.canDouble && !f.doubled && pressed('jump')) { f.vy = -DOUBLE_JUMP_V; f.doubled = true; f.flipT = 0; }
+  // stag beetle: the second jump is a level dash in the travel direction
+  else if (canAct && !f.attack && !f.onGround && f.stats.airDash && !f.doubled && pressed('jump')) {
+    f.doubled = true;
+    f.airDash = { t: 0, dir: held || Math.sign(f.vx) || f.facing };
+  }
   if (canAct && !f.attack && f.onGround && f.platform >= 0 && input.down) { f.drop = DROP_THROUGH_TIME; f.onGround = false; f.platform = -1; f.vy = 0; }
 
   // horizontal movement; guarding slows the walk. A long attack keeps stepping forward and a
@@ -118,6 +142,7 @@ export function stepFighter(f, input, dt, world) {
   if (f.ko) f.vx = approach(f.vx, 0, ICE_DECEL * dt);
   else if (f.super) f.vx = dash ? dash[2] * f.facing : f.onGround ? 0 : f.vx;
   else if (diving) { f.vx = f.facing * DIVE_SPEED * Math.SQRT1_2; f.vy = DIVE_SPEED * Math.SQRT1_2; }
+  else if (dashing(f)) { f.vx = f.airDash.dir * AIR_DASH_DIST / AIR_DASH_TIME; f.vy = 0; }
   else if (world.ice && f.onGround) f.vx = approach(f.vx, target, (dir ? ICE_ACCEL : ICE_DECEL) * dt);
   else if (!f.onGround && (f.attack || f.guarding || f.stun > 0)) { /* keep air momentum */ }
   else f.vx = target;
@@ -129,7 +154,7 @@ export function stepFighter(f, input, dt, world) {
   // vertical movement and landing (platforms are one-way)
   const prevY = f.y;
   if (!f.onGround) {
-    if (!diving) f.vy += GRAVITY * dt;
+    if (!diving && !dashing(f)) f.vy += GRAVITY * dt;
     f.y += f.vy * dt;
     if (f.vy >= 0) {
       if (f.drop <= 0) {
@@ -163,6 +188,7 @@ export function frameName(f) {
   if (f.stun > 0) return f.stun > HIT_STUN * 0.4 ? 'hit' : 'hit0';
   if (f.super) {
     const hits = f.super.def.hits, t = f.super.t;
+    if (!hits.length) return t < f.super.def.time * 0.4 ? 'windup' : 'win'; // summons: a call, then a pointing pose
     if (hits.some(h => t >= h.at && t < h.at + h.len)) return f.onGround ? 'attack' : 'jumpAtk';
     if (t < hits[0].at) return 'windup';
     return hits.some(h => h.at > t) ? 'windup' : 'attack';
@@ -173,6 +199,7 @@ export function frameName(f) {
     const k = f.attack.kind, { startup, active, recovery } = attackTiming(f), t = f.attack.t;
     const early = ph === 'startup' && t < startup * 0.45, rec = (t - startup - active) / recovery;
     if (k === 'dive') return ph === 'recovery' ? 'hit0' : 'dive';
+    if (k === 'charged') return ph === 'startup' ? (Math.floor(t / 0.08) % 2 ? 'heavyWind' : 'chargeHold') : ph === 'active' || rec < 0.4 ? 'heavyAtk' : 'attack1';
     if (k === 'aerial') return ph === 'startup' ? (early ? 'jump' : 'jumpAtk0') : 'jumpAtk';
     if (k === 'long') return ph === 'startup' ? (early ? 'longWind' : 'longAtk0') : ph === 'active' || rec < 0.4 ? 'longAtk' : 'attack1';
     if (k === 'heavy') return ph === 'startup' ? (t < startup * 0.6 ? 'heavyWind' : 'heavyAtk0') : ph === 'active' || rec < 0.5 ? 'heavyAtk' : 'attack1';
@@ -182,7 +209,8 @@ export function frameName(f) {
   }
   if (f.guarding) return f.onGround ? (f.guard ? 'guard' : 'guard0') : 'airGuard';
   if (!f.onGround) {
-    if (f.doubled && f.flipT < FLIP_TIME) return 'flip';
+    if (dashing(f)) return 'airDash';
+    if (f.doubled && f.canDouble && f.flipT < FLIP_TIME) return 'flip';
     return f.vy < -250 ? 'jump' : f.vy <= 250 ? 'apex' : 'fall';
   }
   if (Math.abs(f.vx) > 10) return WALK[Math.floor(f.walk / 11) % 8];

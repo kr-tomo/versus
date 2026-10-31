@@ -127,10 +127,13 @@ class FightScene extends Phaser.Scene {
       return { key, k, tex: this.textures.get(key) };
     };
     const mapScale = clamp(px, 1, 3), charScale = clamp(px * 0.8, 1, 3);
-    const [far, ground, trap, plats, ...chars] = await Promise.all([
+    const [far, ground, trap, plats, bull, ...chars] = await Promise.all([
       sheet(base + m.far, mapScale), sheet(base + m.ground, mapScale), sheet(base + m.trap.sheet, mapScale), sheet(base + m.platforms.sheet, mapScale),
+      sheet(base + t.extras.bull.sheet, charScale),
       ...this.model.settings.weapons.map(w => sheet(base + t.characters[w].sheet, charScale))
     ]);
+    const bc = t.extras.bull.cell;
+    for (let fr = 0; fr < t.extras.bull.frames; fr++) if (!bull.tex.has(`b${fr}`)) bull.tex.add(`b${fr}`, 0, fr * bc[0] * bull.k, 0, bc[0] * bull.k, bc[1] * bull.k);
     const tw = m.trap.cell[0], th = m.trap.cell[1];
     for (let fr = 0; fr < m.trap.frames; fr++) if (!trap.tex.has(`f${fr}`)) trap.tex.add(`f${fr}`, 0, fr * tw * trap.k, 0, tw * trap.k, th * trap.k);
     m.platforms.widths.forEach((w, i) => { if (!plats.tex.has(`w${w}`)) plats.tex.add(`w${w}`, 0, 0, i * m.platforms.cellH * plats.k, (w + 8) * plats.k, m.platforms.cellH * plats.k); });
@@ -142,7 +145,7 @@ class FightScene extends Phaser.Scene {
         s.tex.add(name, 0, col * c.cell[0] * s.k, row * c.cell[1] * s.k, c.cell[0] * s.k, c.cell[1] * s.k);
       }
     });
-    this.sheets = { far, ground, trap, plats, chars };
+    this.sheets = { far, ground, trap, plats, bull, chars };
   }
 
   build() {
@@ -158,6 +161,8 @@ class FightScene extends Phaser.Scene {
     this.debris = this.physics.add.group({ bounceX: 0.3, bounceY: 0.42, dragX: 90, maxSize: 60 });
     this.physics.add.collider(this.debris, this.solids, (d) => { if (Math.abs(d.body.velocity.y) < 40) d.setAngularVelocity(d.body.angularVelocity * 0.6); });
 
+    const bx = theme.extras.bull;
+    this.bullSprite = this.add.sprite(0, 0, sh.bull.key, 'b0').setOrigin(bx.origin[0] / bx.cell[0], bx.origin[1] / bx.cell[1]).setDepth(12).setVisible(false);
     this.fighters = this.model.settings.weapons.map((w, i) => {
       const c = theme.characters[w], s = sh.chars[i];
       const mk = () => this.add.sprite(0, 0, s.key, 'idle0').setOrigin(c.origin[0] / c.cell[0], c.origin[1] / c.cell[1]);
@@ -302,6 +307,19 @@ class FightScene extends Phaser.Scene {
       } else if (e.type === 'miss') {
         this.popText('회피!', e.x, e.y - 18, '#9ef0ff', 16);
         this.sfx('miss', { volume: 0.7 });
+      } else if (e.type === 'break') {
+        // charged attack smashed through the guard
+        this.fx.guard.explode(18, e.x, e.y);
+        this.flashStar(e.x, e.y, 1.1, 0x9fdcff);
+        this.ring(e.x, e.y, 0xffffff, 1.6);
+        this.popText(`-${e.dmg}`, e.x, e.y - 18, '#bfe6ff', 16);
+        this.popText('가드 브레이크!', e.x, e.y - 46, '#ff8a5a', 15);
+        cam.shake(160, 0.009);
+        this.sfx('hitHeavy', { volume: 0.7, rate: 1.2 });
+        this.sfx('guard', { volume: 0.6, rate: 0.6 });
+      } else if (e.type === 'bull') {
+        cam.shake(700, 0.006);
+        this.sfx('quake', { volume: 0.8 });
       } else if (e.type === 'trade') {
         this.popText('동시타격!', e.x, e.y, '#ff8a5a', 18);
         this.ring(e.x, e.y + 40, 0xffffff, 1.6);
@@ -355,9 +373,13 @@ class FightScene extends Phaser.Scene {
         this.trapT[i] -= STEP;
         if (this.trapT[i] <= 0) { this.trapT[i] = 0.16; this.fx.trap.explode(5, f.x, GROUND_Y - 4); if (Math.random() < 0.4) this.sfx('trap', { volume: 0.35 }); }
       }
+      // stag beetle air dash: a streak of afterimage dust
+      if (f.airDash && !p.airDash) { this.ring(f.x, f.y - 40, 0xffd27a, 0.9); this.sfx('miss', { volume: 0.5, rate: 1.4 }); }
+      // charged attack: a rising hum while it charges
+      if (f.attack?.kind === 'charged' && p.attack?.kind !== 'charged') this.sfx('charge', { volume: 0.35, rate: 1.6 });
       // super dash: dust trail from the feet
       if (f.super && f.onGround && Math.abs(f.vx) > 150 && Math.random() < 0.5) this.fx.dust.explode(2, f.x - f.facing * 10, f.y);
-      Object.assign(p, { attack: f.attack, onGround: f.onGround, vy: f.vy, charge: f.charge, ko: f.ko, doubled: f.doubled, diveLanded: f.attack?.landed });
+      Object.assign(p, { airDash: f.airDash, attack: f.attack, onGround: f.onGround, vy: f.vy, charge: f.charge, ko: f.ko, doubled: f.doubled, diveLanded: f.attack?.landed });
     });
 
     if (g.phase !== this.lastPhase) {
@@ -436,20 +458,28 @@ class FightScene extends Phaser.Scene {
       }
       if (v.glow) v.glow.active = !!f.super;
       // dash afterimages
-      const dashing = f.super && Math.abs(f.vx) > 100;
+      const dashing = (f.super || f.airDash?.t < 0.3) && Math.abs(f.vx) > 100;
       v.ghosts.forEach((gh, n) => {
         gh.setVisible(dashing);
         if (dashing) gh.setFrame(frame).setScale(sx, sy).setPosition(f.x - f.vx * 0.025 * (n + 1), f.y).setAlpha(0.32 - n * 0.09);
       });
       // aura while the gauge is full, charging or in a super
       const full = f.meter >= SUPER_MAX && !f.ko;
-      if (f.super || f.charge > 0 || full) {
-        const s = f.super ? 1 : f.charge > 0 ? 0.45 + 0.55 * f.charge / SUPER_HOLD : 0.3 + 0.12 * Math.sin(g.t * 8);
+      const charging = f.attack?.kind === 'charged' && f.attack.t < 0.5;
+      if (f.super || f.charge > 0 || full || charging) {
+        const s = f.super ? 1 : f.charge > 0 ? 0.45 + 0.55 * f.charge / SUPER_HOLD : charging ? 0.3 + f.attack.t * 1.2 : 0.3 + 0.12 * Math.sin(g.t * 8);
         v.aura.setVisible(true).setPosition(f.x, f.y - height(f) / 2).setScale(height(f) * 1.6 / 128).setAlpha(s);
       } else v.aura.setVisible(false);
       v.charge.setPosition(f.x, f.y - height(f) / 2);
+      if (f.attack?.kind === 'charged' && f.attack.t < 0.5) v.charge.emitParticle(1);
       if (f.charge > 0) v.charge.emitParticle(2);
     });
+    const bull = g.bull, bs = this.bullSprite, bx = this.theme.extras.bull;
+    bs.setVisible(!!bull);
+    if (bull) {
+      bs.setPosition(bull.x, GROUND_Y).setScale(bull.dir * bx.scale / this.sheets.bull.k, bx.scale / this.sheets.bull.k).setFrame(`b${Math.floor(bull.t * 14) % bx.frames}`);
+      if (Math.random() < 0.6) this.fx.dust.explode(2, bull.x - bull.dir * 50, GROUND_Y);
+    }
     this.drawHud();
     this.sortCameras();
   }
@@ -457,8 +487,14 @@ class FightScene extends Phaser.Scene {
   // Super close-up: zoom on the user, dim the stage and slide in cinema bars; ease back after.
   updateFocus(dt) {
     const g = this.model, cam = this.cameras.main, user = g.fighters.find(f => f.super);
-    if (user) this.focusAt = { x: user.x + user.facing * 40, y: user.y - height(user) / 2 - 10 };
-    this.focus = clamp(this.focus + (user ? dt / FOCUS_IN : -dt / FOCUS_OUT), 0, 1);
+    // the bull summon takes the camera for its whole run
+    const target = g.bull ? { x: g.bull.x + g.bull.dir * 60, y: GROUND_Y - 70 } : user ? { x: user.x + user.facing * 40, y: user.y - height(user) / 2 - 10 } : null;
+    if (target) {
+      if (!this.focusAt || this.focus === 0) this.focusAt = { ...target };
+      const k = Math.min(1, dt * 14);
+      this.focusAt.x += (target.x - this.focusAt.x) * k; this.focusAt.y += (target.y - this.focusAt.y) * k;
+    }
+    this.focus = clamp(this.focus + (target ? dt / FOCUS_IN : -dt / FOCUS_OUT), 0, 1);
     const e = ease(this.focus), Z = 1 + CLOSE_ZOOM * e;
     cam.setZoom(this.baseZoom * Z);
     if (e > 0 && this.focusAt) {

@@ -27,6 +27,8 @@ export class AI {
       if (me.super || me.stun > 0 || me.meter < SUPER_MAX || !me.onGround) this.charging = false;
       else return { ...this.input, attack: true, guard: true };
     }
+    // keep holding attack to chain a charged (guard-breaking) swing
+    if (this.holdAttack > 0) { this.holdAttack -= dt; this.input.attack = true; return { ...this.input }; }
     this.input.attack = false;
     if (this.pendingGuard > 0 && (this.pendingGuard -= dt) <= 0) this.input.guard = true;
     if (this.cool > 0) return { ...this.input };
@@ -67,8 +69,14 @@ export class AI {
       // just out of normal reach: step in with a long attack
       if (gap > myReach * 0.9 && gap <= myReach + LONG_REACH_BONUS + 10 && r() < p.attack * 0.5) { inp.attack = true; move(dir); return; }
     }
-    // punish recovery or attack when in range
+    // punish recovery or attack when in range; against a turtling opponent, hold for a charged swing
     if (gap <= myReach * 0.9 && !me.attack) {
+      if (op.guarding && r() < p.attack * 0.6) {
+        const s = me.stats;
+        this.holdAttack = s.startup + s.active + s.recovery + 0.55;
+        inp.attack = true;
+        return;
+      }
       if ((p.punish && opPhase === 'recovery') || r() < p.attack) { inp.attack = true; return; }
     }
 
@@ -92,6 +100,8 @@ export class AI {
     if (me.onGround && op.y < me.y - 40 && Math.abs(op.x - me.x) < 120) inp.jump = true;
     else if (me.onGround && r() < p.jump) inp.jump = true;
     if (!me.onGround && me.canDouble && !me.doubled && me.vy > -200 && r() < p.jump * 3) inp.jump = true;
+    // stag beetle: air dash toward a distant opponent
+    if (!me.onGround && me.stats.airDash && !me.doubled && gap > 120 && r() < p.jump * 4) { inp.jump = true; move(dir); }
     // after a double jump: dive when the opponent sits roughly on the 45° line ahead
     const dx = (op.x - me.x) * me.facing, dy = op.y - me.y;
     if (me.doubled && !me.attack && dx > 0 && Math.abs(dx - dy) < 70 && r() < p.attack) inp.attack = true;

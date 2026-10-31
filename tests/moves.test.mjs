@@ -86,8 +86,9 @@ test('double jump: only fighters with reach at most half the longest', () => {
     step(f, { ...NO_INPUT, jump: true }); step(f, NO_INPUT, 20);
     const vy = f.vy;
     step(f, { ...NO_INPUT, jump: true });
-    assert.equal(f.doubled, WEAPONS[w].reach <= MAX_REACH / 2, w);
-    assert.equal(f.vy < -500 && vy > -500, f.doubled, w);
+    const flips = WEAPONS[w].reach <= MAX_REACH / 2;
+    assert.equal(f.doubled, flips || !!WEAPONS[w].airDash, w);   // the stag's second jump is a level dash
+    assert.equal(f.vy < -500 && vy > -500, flips, w);
   }
   // only once per jump, and it resets on landing
   const f = createFighter('fist', 400, 1);
@@ -122,4 +123,81 @@ test('frames: twice the old count, every frame the game asks for exists in each 
     assert.ok(Object.keys(frames).length >= 30, w);
     for (const n of names) assert.ok(n in frames, `${w} ${n}`);
   }
+});
+
+/* ---------- cross-up turn delay ---------- */
+test('turn: after a cross-up the fighter turns after 0.5s, or at once on attack/guard', () => {
+  const late = createFighter('sword', 400, 1); late.wantFacing = -1;
+  step(late, NO_INPUT, 30);
+  assert.equal(late.facing, 1, 'still facing the old way at 0.25s');
+  step(late, NO_INPUT, 31);
+  assert.equal(late.facing, -1, 'turned after 0.5s');
+  for (const key of ['attack', 'guard']) {
+    const f = createFighter('sword', 400, 1); f.wantFacing = -1;
+    step(f, NO_INPUT, 5);
+    step(f, { ...NO_INPUT, [key]: true });
+    assert.equal(f.facing, -1, key);
+    if (key === 'attack') assert.equal(f.attack.kind, 'normal', 'the attack goes toward the new side');
+  }
+});
+
+/* ---------- charged attack ---------- */
+const holdAttack = (f, secs) => { for (let t = 0; t < secs; t += DT) stepFighter(f, { ...NO_INPUT, attack: true }, DT, world); };
+
+test('charged: holding attack chains a 0.5s charge after the first normal swing', () => {
+  const f = createFighter('sword', 400, 1);
+  const total = WEAPONS.sword.startup + WEAPONS.sword.active + WEAPONS.sword.recovery;
+  holdAttack(f, DT);
+  assert.equal(f.attack.kind, 'normal');
+  holdAttack(f, total);
+  assert.equal(f.attack.kind, 'charged');
+  assert.equal(strike(f), null, 'no hit while charging');
+  holdAttack(f, 0.5);
+  assert.ok(strike(f), 'swings after the charge');
+  // releasing during the charge cancels it
+  const g = createFighter('sword', 400, 1);
+  holdAttack(g, total + DT * 2);
+  assert.equal(g.attack.kind, 'charged');
+  step(g, NO_INPUT);
+  assert.equal(g.attack, null);
+  // a tap is just a normal attack
+  const h = createFighter('sword', 400, 1);
+  step(h, { ...NO_INPUT, attack: true }); step(h, NO_INPUT, 120);
+  assert.equal(h.attack, null);
+});
+
+test('charged: breaks guard for half damage and +2 gauge to the guarder; full damage unguarded', () => {
+  const att = createFighter('mace', 500, 1);
+  att.attack = { t: 0.5 + 0.01, kind: 'charged', aerial: false, hit: false };
+  const def = createFighter('sword', 560, -1); def.guard = def.guarding = true;
+  const s = strike(att);
+  const r = applyHit(att, def, s, never);
+  assert.equal(r.damage, Math.round(WEAPONS.mace.power * 0.5));
+  assert.equal(def.guard, false); assert.ok(def.stun > 0, 'guard broken');
+  assert.equal(def.meter, 2);
+  const open = createFighter('sword', 560, -1);
+  assert.equal(applyHit(att, open, s, never).damage, WEAPONS.mace.power);
+});
+
+/* ---------- stag beetle ---------- */
+test('stag: second jump dashes level in the travel direction, untouchable, no attack until its end', () => {
+  const f = createFighter('stag', 400, 1);
+  step(f, { ...NO_INPUT, jump: true }); step(f, NO_INPUT, 12);
+  const y = f.y;
+  step(f, { ...NO_INPUT, jump: true, left: true });
+  assert.ok(f.airDash && f.airDash.dir === -1, 'dashes the way it is travelling');
+  const x0 = f.x;
+  step(f, { ...NO_INPUT, left: true }, 6);
+  assert.ok(Math.abs(f.y - y) < 1, 'level flight');
+  step(f, { ...NO_INPUT, attack: true });
+  assert.equal(f.attack, null, 'no attack mid-dash');
+  // untouchable while dashing
+  const a = createFighter('spear', f.x + 60, -1);
+  a.attack = { t: a.stats.startup + 0.01, kind: 'normal', aerial: false, hit: false }; a.y = f.y;
+  assert.equal(resolveHits(a, f, never).length, 0);
+  step(f, NO_INPUT, Math.round((0.26 - 0.05) / DT) - 8);
+  step(f, NO_INPUT);
+  step(f, { ...NO_INPUT, attack: true });
+  assert.equal(f.attack?.kind, 'aerial', 'air attack allowed right before the dash ends');
+  assert.ok(x0 - f.x > 120);
 });

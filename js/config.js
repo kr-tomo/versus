@@ -1,7 +1,7 @@
 // Gameplay constants. Visuals live in themes/<id>/theme.json.
 
 // Shown on the title screen; keep in step with CACHE in sw.js.
-export const APP_VERSION = 'v6';
+export const APP_VERSION = 'v7';
 
 export const WORLD_W = 1280;
 export const VIEW_W = 640;
@@ -36,8 +36,10 @@ export const WEAPONS = {
   axe:     { name: '도끼',     power: 20, reach: 70,  startup: 0.33, active: 0.12, recovery: 0.42, move: 0.9,  guardUp: 0.15 },
   dagger:  { name: '단검',     power: 8,  reach: 45,  startup: 0.09, active: 0.09, recovery: 0.16, move: 1.1,  guardUp: 0.04 },
   fist:    { name: '맨손',     power: 6,  reach: 35,  startup: 0.07, active: 0.08, recovery: 0.12, move: 1.15, guardUp: 0.03 },
-  stag:    { name: '큰 턱',    power: 14, reach: 85,  startup: 0.17, active: 0.10, recovery: 0.26, move: 1.0,  guardUp: 0.08 },
-  genghis: { name: '청룡언월도', power: 22, reach: 140, startup: 0.36, active: 0.13, recovery: 0.46, move: 0.85, guardUp: 0.17, halfW: 26, height: 110 }
+  stag:    { name: '큰 턱',    power: 14, reach: 85,  startup: 0.17, active: 0.10, recovery: 0.26, move: 1.0,  guardUp: 0.08, airDash: true },
+  genghis: { name: '청룡언월도', power: 22, reach: 140, startup: 0.36, active: 0.13, recovery: 0.46, move: 0.85, guardUp: 0.17, halfW: 26, height: 110 },
+  mace:    { name: '철퇴',     power: 18, reach: 92,  startup: 0.30, active: 0.12, recovery: 0.40, move: 0.88, guardUp: 0.13 },
+  fork:    { name: '갈퀴',     power: 10, reach: 110, startup: 0.18, active: 0.10, recovery: 0.27, move: 1.0,  guardUp: 0.09 }
 };
 export const WEAPON_IDS = Object.keys(WEAPONS);
 export const MAX_POWER = Math.max(...WEAPON_IDS.map(w => WEAPONS[w].power));
@@ -79,6 +81,23 @@ export const SUPER_GAIN_HIT = 3;
 export const SUPER_GAIN_GUARD = 1;
 export const SUPER_HOLD = 1;
 
+// After the fighters cross, turning around takes TURN_DELAY unless attack or guard is pressed.
+export const TURN_DELAY = 0.5;
+
+// Charged attack: keep holding attack through a ground attack, charge CHARGE_TIME, then swing.
+// It breaks guard: a guarding defender takes half damage, is staggered, and gains 2 gauge.
+export const CHARGE_TIME = 0.5;
+export const CHARGE_MULT = 1;          // damage vs the fighter's normal attack
+export const CHARGE_GUARD_RATIO = 0.5;
+export const CHARGE_BREAK_STUN = 0.45;
+export const SUPER_GAIN_CHARGE_GUARD = 2;
+
+// Stag beetle air dash: its second jump flies level in the travel direction. It ignores hits
+// while flying and can't attack until the last AIR_DASH_ATTACK seconds.
+export const AIR_DASH_DIST = 210;
+export const AIR_DASH_TIME = 0.26;
+export const AIR_DASH_ATTACK = 0.06;
+
 // Supers. The user is invulnerable while it runs.
 //   dash: [from, to, speed] forward movement   blink: teleport behind the opponent at this time
 //   hits: at/len (window), reach, dmg, kb, stun; ub = ignores guard, crush = guard breaks (chip + stun),
@@ -96,10 +115,17 @@ export const SUPERS = {
     hits: rapid(4, 0.26, 0.12, { reach: 55, dmg: 7, kb: 10, stun: 0.35, ub: true }).map((h, i, a) => i === a.length - 1 ? { ...h, kb: 110 } : h) },
   fist: { name: '백열권', time: 1.2, range: 60, dash: [[0, 1.0, 70]],
     hits: [...rapid(10, 0.1, 0.08, { reach: 50, dmg: 3, kb: 3, stun: 0.25 }), { at: 0.98, len: 0.08, reach: 60, dmg: 10, kb: 150, stun: 0.6 }] },
-  stag: { name: '집게 내던지기', time: 1.0, range: 90, dash: [[0.1, 0.25, 260]],
-    hits: [{ at: 0.2, len: 0.15, reach: 95, dmg: 30, kb: 160, stun: 0.9, ub: true, launch: 680 }] },
+  // teleports onto the opponent: sure = connects wherever the opponent is, can't be dodged or guarded
+  stag: { name: '집게 내던지기', time: 1.0, range: 2000, blink: 0.15, blinkSide: 'front',
+    hits: [{ at: 0.22, len: 0.12, reach: 95, dmg: 30, kb: 160, stun: 0.9, ub: true, sure: true, launch: 680 }] },
   genghis: { name: '기마 돌격', time: 1.05, range: 330, dash: [[0.18, 0.85, 620]],
-    hits: [{ at: 0.18, len: 0.67, reach: 170, dmg: 38, kb: 240, stun: 0.9, crush: true }] }
+    hits: [{ at: 0.18, len: 0.67, reach: 170, dmg: 38, kb: 240, stun: 0.9, crush: true }] },
+  // grab: anything within twice the reach in front is caught (any height), pulled in and thrown far
+  mace: { name: '잡아던지기', time: 0.95, range: 180,
+    hits: [{ at: 0.25, len: 0.1, reach: 184, dmg: 34, kb: 420, stun: 1.1, ub: true, noEvade: true, tall: true, grab: true, launch: 620 }] },
+  // a bull charges in from the screen edge behind the farmer and runs across the whole map
+  fork: { name: '황소 돌격', time: 0.6, range: 2000, hits: [],
+    bull: { at: 0.2, speed: 950, dmg: 32, kb: 280, stun: 0.9, launch: 460 } }
 };
 
 // Per-map variables. Layout is regenerated every round inside these safe ranges.

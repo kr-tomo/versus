@@ -1,8 +1,8 @@
 // Precache the whole app per version and serve only from that cache, so files of two versions
 // never mix. A new version arrives by changing CACHE; the page reloads once when it takes over.
-const CACHE = 'versus-v6';
+const CACHE = 'versus-v7';
 const THEME = 'themes/classic/';
-const CHARS = ['sword', 'spear', 'axe', 'dagger', 'fist', 'stag', 'genghis'];
+const CHARS = ['sword', 'spear', 'axe', 'dagger', 'fist', 'stag', 'genghis', 'mace', 'fork'];
 const MAPS = ['lava', 'jungle', 'seoul', 'tundra'];
 const SFX = ['swing', 'swingHeavy', 'hit', 'hitHeavy', 'guard', 'miss', 'jump', 'land', 'charge', 'super', 'quake', 'ko',
   'round', 'fight', 'trade', 'trap', 'move', 'select', 'back', 'win'];
@@ -11,7 +11,7 @@ const PRECACHE = [
   ...['main', 'config', 'layout', 'mapgen', 'camera', 'fighter', 'combat', 'ai', 'input', 'assets', 'stage', 'menu', 'game'].map(m => `js/${m}.js`),
   'vendor/phaser-4.2.1.esm.min.js',
   ...SFX.map(n => `sfx/${n}.wav`),
-  THEME + 'theme.json',
+  THEME + 'theme.json', THEME + 'extras/bull.svg',
   ...CHARS.flatMap(c => [`${THEME}characters/${c}.svg`, `${THEME}portraits/${c}.svg`]),
   ...MAPS.flatMap(m => ['far', 'ground', 'trap', 'platforms'].map(l => `${THEME}maps/${m}/${l}.svg`))
 ];

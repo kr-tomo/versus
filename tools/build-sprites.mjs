@@ -3,7 +3,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CHARS, FRAMES, renderChar, f } from './art/rig.js';
+import { CHARS, FRAMES, renderChar, renderBull, BULL_FRAMES, f } from './art/rig.js';
 import { MAP_ART } from './art/maps.js';
 import { MAPS, PLATFORM_WIDTHS } from '../js/config.js';
 
@@ -60,6 +60,13 @@ for (const [id, art] of Object.entries(MAP_ART)) {
     extras: art.extras || {}
   };
 }
+
+// the farmer's bull: one row of gallop frames
+const BULL_CELL = [180, 110], BULL_ORIGIN = [80, 104];
+let bull = '';
+for (let i = 0; i < BULL_FRAMES; i++) bull += `<g transform="translate(${i * BULL_CELL[0] + BULL_ORIGIN[0]} ${BULL_ORIGIN[1]})">${renderBull(i)}</g>`;
+write('extras/bull.svg', svg(BULL_CELL[0] * BULL_FRAMES, BULL_CELL[1], bull));
+theme.extras = { bull: { sheet: 'extras/bull.svg', cell: BULL_CELL, origin: BULL_ORIGIN, frames: BULL_FRAMES, scale: 0.85 } };
 
 write('theme.json', JSON.stringify(theme, null, 2) + '\n');
 console.log(`theme written to ${out}`);

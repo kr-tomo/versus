@@ -84,7 +84,7 @@ h2 { margin: 0; font-size: calc(var(--u) * 5); }
 .vs { font-weight: 900; font-size: calc(var(--u) * 6); color: var(--accent); }
 .roster { display: flex; gap: calc(var(--u) * 1); }
 .portrait {
-  --s: calc(var(--u) * 8.6);
+  --s: calc(var(--u) * 7);
   width: var(--s); padding: 0; border-radius: 10px; overflow: hidden; background: var(--panel); border: 3px solid var(--line);
   display: flex; flex-direction: column; align-items: center;
 }

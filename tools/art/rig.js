@@ -51,6 +51,20 @@ const WEAPONS = {
     <path d="M5 -2.5 Q18 -3 27 4 Q22 6 18 4 Q12 2 5 2.5 Z" fill="#e3e8ee" stroke="${OL}" stroke-width="1.8" stroke-linejoin="round"/>`,
   fist: () => '',
   stag: () => '',
+  mace: () => `
+    <line x1="-12" y1="0" x2="44" y2="0" stroke="${OL}" stroke-width="7" stroke-linecap="round"/>
+    <line x1="-12" y1="0" x2="44" y2="0" stroke="#4a4f57" stroke-width="4" stroke-linecap="round"/>
+    <rect x="-10" y="-3.2" width="12" height="6.4" rx="1.5" fill="#3a2414" stroke="${OL}" stroke-width="1.4"/>
+    <circle cx="-13" cy="0" r="3.2" fill="#6e737a" stroke="${OL}" stroke-width="1.4"/>
+    ${[0, 45, 90, 135, 180, 225, 270, 315].map(a => `<path d="M52 0 L${f(52 + Math.cos(a * Math.PI / 180) * 15)} ${f(Math.sin(a * Math.PI / 180) * 15)}" stroke="${OL}" stroke-width="5" stroke-linecap="round"/><path d="M52 0 L${f(52 + Math.cos(a * Math.PI / 180) * 14)} ${f(Math.sin(a * Math.PI / 180) * 14)}" stroke="#8a9098" stroke-width="2.6" stroke-linecap="round"/>`).join('')}
+    <circle cx="52" cy="0" r="8.5" fill="#5e636b" stroke="${OL}" stroke-width="2.2"/>
+    <circle cx="49.5" cy="-2.5" r="2.4" fill="#b9c0c8"/>`,
+  fork: () => `
+    <line x1="-46" y1="0" x2="74" y2="0" stroke="${OL}" stroke-width="6.5" stroke-linecap="round"/>
+    <line x1="-46" y1="0" x2="74" y2="0" stroke="#b08850" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M72 -10 Q70 0 72 10" stroke="${OL}" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M72 -10 Q70 0 72 10" stroke="#8a9098" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+    ${[-10, 0, 10].map(y => `<path d="M72 ${y} L98 ${y * 0.9} L102 ${y * 0.9 - 1}" stroke="${OL}" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M72 ${y} L98 ${y * 0.9} L102 ${y * 0.9 - 1}" stroke="#a9b1ba" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`).join('')}`,
   genghis: () => `
     <line x1="-62" y1="0" x2="96" y2="0" stroke="${OL}" stroke-width="7" stroke-linecap="round"/>
     <line x1="-62" y1="0" x2="96" y2="0" stroke="#5a2a14" stroke-width="4" stroke-linecap="round"/>
@@ -93,7 +107,9 @@ const DERIVED = {
   heavyWind: { from: ['windup', 'windup', 0], add: { lean: -10, tilt: -5, fUp: 12, w: -20, fTh: 4, bTh: -4 } },
   heavyAtk:  { from: ['attack', 'attack', 0], add: { lean: 10, tilt: 8, fUp: 14, w: 42, wB: 30 }, set: { fTh: 62, fSh: 18, bTh: -46, bSh: -58 } },
   flip:      { from: ['jump', 'jump', 0], add: { lean: 12 }, set: { fTh: 115, fSh: 10, bTh: 95, bSh: -10, fUp: 100, fFo: 40, bUp: 80, bFo: 20 } },
-  dive:      { from: ['jumpAtk', 'jumpAtk', 0], add: { lean: 24, w: 30, wB: 30 }, set: { fTh: -15, fSh: -55, bTh: -40, bSh: -85 } }
+  dive:      { from: ['jumpAtk', 'jumpAtk', 0], add: { lean: 24, w: 30, wB: 30 }, set: { fTh: -15, fSh: -55, bTh: -40, bSh: -85 } },
+  chargeHold:{ from: ['heavyWind', 'heavyWind', 0], add: { lean: -4, tilt: -3 }, set: { fTh: 48, fSh: -6, bTh: -40, bSh: -30 } },
+  airDash:   { from: ['jump', 'jump', 0], add: { lean: 50 }, set: { fTh: -40, fSh: -75, bTh: -62, bSh: -95, fUp: 95, fFo: 100, bUp: 85, bFo: 95 } }
 };
 
 // Sprite frames: key poses plus in-betweens [name, from, to, mix] — twice the old frame count.
@@ -107,7 +123,7 @@ const FRAME_DEFS = [
   ['hit'], ['hit0', 'hit', 'idle0', 0.5], ['win'], ['win0', 'win', 'idle0', 0.35],
   ['longWind'], ['longAtk0', 'longWind', 'longAtk', 0.5], ['longAtk'],
   ['heavyWind'], ['heavyAtk0', 'heavyWind', 'heavyAtk', 0.5], ['heavyAtk'],
-  ['flip'], ['dive']
+  ['flip'], ['dive'], ['chargeHold'], ['airDash']
 ];
 const FRAME_BY_NAME = Object.fromEntries(FRAME_DEFS.map(d => [d[0], d]));
 export const FRAMES = FRAME_DEFS.map(d => d[0]);
@@ -271,7 +287,8 @@ export const CHARS = [
       idle0: { fUp: 40, fFo: 120, bUp: 30, bFo: 110 }, windup: { jaw: 48, lean: -8, tilt: -6, fUp: 20, fFo: 140, bUp: 10, bFo: 130 },
       attack: { jaw: 2, lean: 30, tilt: 12, fUp: 60, fFo: 100, bUp: 40, bFo: 90 },
       guard: { jaw: 6, fUp: 20, fFo: 165, bUp: 25, bFo: 160 }, airGuard: { jaw: 6, fUp: 20, fFo: 165, bUp: 25, bFo: 160 },
-      jumpAtk: { jaw: 4, lean: 26, tilt: 14 }, hit: { jaw: 34 }, win: { jaw: 52, fUp: 170, fFo: 175, bUp: 160, bFo: 175, tilt: -14 }
+      jumpAtk: { jaw: 4, lean: 26, tilt: 14 }, hit: { jaw: 34 }, win: { jaw: 52, fUp: 170, fFo: 175, bUp: 160, bFo: 175, tilt: -14 },
+      airDash: { jaw: 44, tilt: -30 }
     },
     back: c => `<path d="M-4 -31 Q-28 -24 -26 12 Q-16 20 -4 8 Z" fill="#6b3d1c" stroke="${OL}" stroke-width="2.5" stroke-linejoin="round"/>
       <path d="M-8 -26 Q-20 -18 -20 4" stroke="#a8703c" stroke-width="2.4" fill="none" stroke-linecap="round"/>`,
@@ -313,8 +330,81 @@ export const CHARS = [
       <path d="M-1 -35 L1 -49 L3 -35 Z" fill="#d4a017" stroke="${OL}" stroke-width="1.5"/>
       <path d="M1 -45 Q-11 -47 -15 -36 Q-7 -41 -3 -38 Z" fill="#d0262e" stroke="${OL}" stroke-width="1.5"/>
       <path d="M7 -15 L13 -14" stroke="${OL}" stroke-width="2" stroke-linecap="round"/>`
+  },
+  {
+    id: 'mace', name: '모르드레드', en: 'Mordred', weaponName: '철퇴', origin: '중갑옷의 흑기사',
+    accent: '#6a1a22', skin: '#d8b090', body: '#2b2d33', sleeve: '#3a3d45', fore: '#2b2d33', pants: '#33363e', shin: '#1d1f24', cape: '#4a0e14',
+    poses: {
+      idle0: { w: -60, fUp: 20, fFo: 110 }, windup: { fUp: 165, fFo: 210, w: -170, lean: -8 }, attack: { fUp: 105, fFo: 85, w: 20, lean: 22 },
+      guard: { w: -95 }, jumpAtk: { w: 55, fUp: 115, fFo: 65 }, win: { w: -80, fUp: 170, fFo: 175 }
+    },
+    torso: c => `<path d="M-11 0 L11 0 L14 14 L-14 14 Z" fill="${c.pants}" stroke="${OL}" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M-13 14 L-9 4 L-5 14 M-1 14 L3 4 L7 14" stroke="#1d1f24" stroke-width="1.6" fill="none"/>
+      <path d="M-11 1 L11 1 L14 -27 Q0 -35 -14 -27 Z" fill="${c.body}" stroke="${OL}" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M-6 -27 Q0 -22 6 -27 M-11 -15 Q0 -11 12 -15" stroke="#4d515a" stroke-width="2" fill="none"/>
+      <path d="M2 -24 Q8 -20 8 -8" stroke="#6b707a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      ${[[-8, -19], [8, -19], [-8, -7], [8, -7]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.2" fill="#8a9098"/>`).join('')}
+      <rect x="-12" y="-5" width="24" height="4.5" fill="#1d1f24" stroke="${OL}" stroke-width="1"/><rect x="-2" y="-5.5" width="5" height="5.5" fill="#8a1a22"/>
+      <ellipse cx="-11" cy="-27" rx="7" ry="5" fill="#3a3d45" stroke="${OL}" stroke-width="2"/>`,
+    headFront: c => `<path d="M-14 -26 Q1 -33 16 -26 L17 2 Q1 5 -14 2 Z" fill="#2b2d33" stroke="${OL}" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M3 -17 L17 -17 M3 -12 L17 -12" stroke="#0c0d10" stroke-width="2.8"/>
+      <path d="M-11 -24 Q1 -29 14 -24" stroke="#5a5f68" stroke-width="2" fill="none"/>
+      <path d="M8 -26 L8 1" stroke="#3f434b" stroke-width="2.4"/>
+      ${[[11, -6], [14, -6], [11, -2], [14, -2]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r=".9" fill="#0c0d10"/>`).join('')}
+      <path d="M-2 -30 Q-8 -46 -24 -42 Q-14 -40 -12 -34 Q-20 -36 -26 -30 Q-12 -30 -4 -28 Z" fill="#8a1a22" stroke="${OL}" stroke-width="1.6" stroke-linejoin="round"/>`
+  },
+  {
+    id: 'fork', name: '얀', en: 'Jan', weaponName: '갈퀴', origin: '네덜란드 농부',
+    accent: '#e08a1e', skin: '#f2c8a0', body: '#3b6db3', sleeve: '#3b6db3', fore: '#f2c8a0', pants: '#2f4a7a', shin: '#d9a441', twoHand: true,
+    poses: {
+      idle0: { fUp: 40, fFo: 80, w: -15 }, windup: { fUp: 45, fFo: 60, w: -8, lean: -6 }, attack: { fUp: 95, fFo: 90, w: 0, lean: 20 }, guard: { w: -65, fFo: 150 },
+      jump: { w: -40, fUp: 110, fFo: 120 }, fall: { w: -30, fUp: 90, fFo: 110 }, jumpAtk: { w: 25, fUp: 95, fFo: 75 }, airGuard: { w: -65, fFo: 150 },
+      win: { w: -100, fUp: 160, fFo: 175 }
+    },
+    torso: c => `<path d="M-11 0 L11 0 L13 13 L-13 13 Z" fill="${c.pants}" stroke="${OL}" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M-11 1 L11 1 L12 -27 Q0 -33 -12 -27 Z" fill="${c.body}" stroke="${OL}" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M-6 -2 L-5 -27 M5 -2 L4 -27" stroke="#2f4a7a" stroke-width="3"/>
+      <circle cx="-5" cy="-10" r="1.3" fill="#e8e0c8"/><circle cx="4" cy="-10" r="1.3" fill="#e8e0c8"/>
+      <path d="M-7 -29 L0 -21 L7 -29 Z" fill="#d23a2a" stroke="${OL}" stroke-width="1.5" stroke-linejoin="round"/>
+      <circle cx="-1" cy="-25" r="1" fill="#fff"/><circle cx="3" cy="-27" r="1" fill="#fff"/>`,
+    headFront: c => `<path d="M-13 -18 Q-14 -10 -11 -4" stroke="#e8c45a" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M9 -7 Q12 -4 15 -6" stroke="${OL}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      <circle cx="12" cy="-9" r="2.4" fill="#f0a890" opacity=".7"/>
+      <path d="M-22 -22 Q1 -30 26 -22 Q1 -18 -22 -22 Z" fill="#e8c86a" stroke="${OL}" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M-12 -23 Q-11 -37 1 -37 Q13 -37 14 -23 Z" fill="#e8c86a" stroke="${OL}" stroke-width="2.2" stroke-linejoin="round"/>
+      <path d="M-12 -25 Q1 -28 14 -25" stroke="#c23a2a" stroke-width="3" fill="none"/>
+      <path d="M-8 -33 Q1 -35 10 -33" stroke="#f5e2a0" stroke-width="1.6" fill="none"/>`
   }
 ];
+
+/* ---------- the farmer's bull (feet at y=0, facing +x) ---------- */
+const BULL_LEGS = [
+  [[30, 10], [5, -40], [-30, -10], [5, -35]], [[5, -45], [30, 10], [0, -40], [-30, -10]],
+  [[-25, -30], [15, -60], [25, 5], [-10, -45]], [[15, -60], [-25, -30], [-10, -45], [25, 5]]
+];
+export const BULL_FRAMES = BULL_LEGS.length;
+export function renderBull(frame) {
+  const hide = '#3a2418', dark = shade(hide, 0.7);
+  const hips = [[30, -36], [26, -36], [-34, -38], [-38, -38]];
+  const legs = BULL_LEGS[frame].map(([u, l], i) => { const k = P(hips[i], 18, u); return [hips[i], k, P(k, 18, l)]; });
+  const leg = ([h, k, a], far) => ln(h, k, 14, OL) + ln(k, a, 10, OL) + ln(h, k, 10, far ? dark : hide) + ln(k, a, 6, far ? dark : hide)
+    + `<rect x="${f(a[0] - 5)}" y="${f(a[1] - 3)}" width="10" height="5" rx="1.5" fill="#141010" stroke="${OL}" stroke-width="1.5"/>`;
+  let s = `<path d="M-52 -58 Q-66 -48 -62 -28 L-58 -30 Q-60 -44 -50 -52 Z" fill="${hide}" stroke="${OL}" stroke-width="2"/>
+    <path d="M-64 -30 Q-68 -24 -62 -20 Q-60 -26 -60 -30 Z" fill="#141010"/>`;
+  s += leg(legs[1], true) + leg(legs[3], true);
+  s += `<path d="M-54 -50 Q-56 -32 -40 -30 L30 -30 Q48 -32 50 -50 Q50 -74 30 -78 Q0 -84 -30 -74 Q-52 -68 -54 -50 Z" fill="${hide}" stroke="${OL}" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M10 -78 Q30 -86 44 -74 L50 -56 Q40 -70 14 -72 Z" fill="${dark}"/>
+    <path d="M44 -66 Q58 -70 70 -58 L74 -42 Q72 -32 62 -32 Q52 -34 46 -44 Z" fill="${hide}" stroke="${OL}" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M62 -36 Q70 -34 74 -40" stroke="#c99a7a" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <circle cx="70" cy="-38" r="3.2" fill="none" stroke="#d4a017" stroke-width="2"/>
+    <circle cx="60" cy="-54" r="2.6" fill="#ff3a2a" stroke="${OL}" stroke-width="1"/>
+    <path d="M56 -64 Q48 -76 56 -86 Q58 -76 64 -70 Z" fill="#efe6cf" stroke="${OL}" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M64 -64 Q72 -78 84 -78 Q74 -72 70 -62 Z" fill="#efe6cf" stroke="${OL}" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M74 -40 Q82 -44 86 -40 M74 -36 Q82 -34 86 -30" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round" opacity=".8"/>`;
+  s += leg(legs[0], false) + leg(legs[2], false);
+  const ground = Math.max(...legs.map(l => l[2][1])) + 2;
+  return `<g transform="translate(0 ${f(-ground)})">${s}</g>`;
+}
 
 function poseFor(c, name) {
   const ov = c.poses || {};
