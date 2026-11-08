@@ -1,3 +1,5 @@
+import { readPad } from './input.js';
+
 // Gamepad / keyboard navigation for the DOM screens.
 // Sources: every connected pad (by index) and the keyboard ('kb').
 // Emits: up down left right ok back start, with auto-repeat for directions.
@@ -41,9 +43,7 @@ export class MenuNav {
   // Call every animation frame with the connected pads.
   poll(dt, pads) {
     pads.forEach((pad, src) => {
-      const b = i => !!pad.buttons[i]?.pressed;
-      const ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
-      const dirs = { up: b(12) || ay < -0.55, down: b(13) || ay > 0.55, left: b(14) || ax < -0.55, right: b(15) || ax > 0.55 };
+      const p = readPad(pad, 0.55), dirs = p;
       for (const d of DIRS) {
         const k = `${src}:${d}`;
         if (!dirs[d]) { this.held.delete(k); continue; }
@@ -54,7 +54,7 @@ export class MenuNav {
         if (nt >= REPEAT_DELAY && Math.floor((nt - REPEAT_DELAY) / REPEAT_RATE) !== Math.floor((t - REPEAT_DELAY) / REPEAT_RATE)) this.onAction(d, src, true);
       }
       const prev = this.prevButtons.get(src) || [];
-      const now = [b(0), b(1), b(9), b(8), b(4), b(5)];
+      const now = [p.a, p.b, p.start, p.select, p.lb, p.rb];
       ['ok', 'back', 'start', 'select', 'prev', 'next'].forEach((a, i) => { if (now[i] && !prev[i]) this.onAction(a, src, false); });
       this.prevButtons.set(src, now);
     });
@@ -63,6 +63,6 @@ export class MenuNav {
 
   // Swallow buttons already held (e.g. A pressed to confirm) so they don't fire again.
   sync(pads) {
-    pads.forEach((pad, src) => this.prevButtons.set(src, [0, 1, 9, 8, 4, 5].map(i => !!pad.buttons[i]?.pressed)));
+    pads.forEach((pad, src) => { const p = readPad(pad); this.prevButtons.set(src, [p.a, p.b, p.start, p.select, p.lb, p.rb]); });
   }
 }

@@ -21,7 +21,7 @@ const SCREENS = {
 };
 const HINTS = {
   title: 'Ⓐ 선택',
-  setup: 'Ⓐ 결정 · Ⓑ 뒤로 · LB/RB 맵 · ☰ 시작',
+  setup: '방향키 커서 · Ⓐ 선택 · Ⓑ 뒤로 · LB/RB 맵 · ☰ 시작',
   pause: 'Ⓐ 선택 · Ⓑ/☰ 계속하기',
   confirm: 'Ⓐ 선택 · Ⓑ 계속하기',
   result: 'Ⓐ 선택 · Ⓑ 메뉴로'
@@ -43,7 +43,8 @@ function show(id) {
   const playing = id === null || id === 'pause' || id === 'result' || id === 'confirm';
   stageEl.hidden = controls.hidden = !playing;
   pauseBtn.hidden = exitBtn.hidden = id !== null;
-  if (id) setFocus(focused.get(id)?.isConnected && !focused.get(id).hidden ? focused.get(id) : defaultFocus(id), false);
+  if (id) setFocus(focused.get(id)?.isConnected && !focused.get(id).hidden ? focused.get(id) : defaultFocus(id));
+  setP2Focus(id === 'setup' && settings.mode === '2p' && input?.pads().length > 1 ? p2Items().find(b => b.dataset.w === settings.weapons[1]) : null);
   nav?.sync(input.pads());
   updateHints();
 }
@@ -58,18 +59,29 @@ function focusables() {
   return el ? [...el.querySelectorAll('button')].filter(b => b.offsetParent !== null && !b.disabled) : [];
 }
 
-// Focusing a portrait or a map selects it right away (live preview); everything else waits for A.
-function setFocus(el, select = true) {
+// The cursor only moves; a portrait or map is picked when Ⓐ (Enter) is pressed on it.
+function setFocus(el) {
   if (!el) return;
   document.querySelector('.nav-focus')?.classList.remove('nav-focus');
   el.classList.add('nav-focus');
   focused.set(activeScreen, el);
-  if (select && (el.dataset.w || el.dataset.map)) el.click();
 }
+
+// In 2P setup the second pad has its own cursor inside P2's roster.
+const p2Items = () => [...document.querySelectorAll('#setup .side[data-player="1"] [data-w]')];
+function setP2Focus(el) {
+  document.querySelector('.nav-focus2')?.classList.remove('nav-focus2');
+  el?.classList.add('nav-focus2');
+}
+const rects = items => items.map(b => { const r = b.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
 
 function updateHints() {
   const pads = input?.pads().length || 0;
-  const text = activeScreen && pads ? HINTS[activeScreen] + (activeScreen === 'setup' && settings.mode === '2p' && pads > 1 ? ' · P2 패드 ◀▶ 캐릭터' : '') : '';
+  let text = activeScreen && pads ? HINTS[activeScreen] + (activeScreen === 'setup' && settings.mode === '2p' && pads > 1 ? ' · P2 패드는 P2 캐릭터' : '') : '';
+  // no pad seen yet on the title: tell the player how to wake it up
+  if (activeScreen === 'title' && !pads) text = window.isSecureContext === false
+    ? '보안 연결(HTTPS)이 아니라 컨트롤러가 막혀 있을 수 있습니다'
+    : '컨트롤러는 아무 버튼이나 한 번 누르면 연결됩니다';
   hints.textContent = text;
   hints.hidden = !text;
 }
@@ -85,16 +97,21 @@ function onNav(action, src, repeat) {
   }
   document.body.classList.add('nav');
 
-  // in 2P setup the second pad picks P2's fighter directly
+  // in 2P setup the second pad moves its own cursor over P2's roster and picks with Ⓐ
   if (activeScreen === 'setup' && settings.mode === '2p' && src === 1) {
-    if (action === 'left' || action === 'right') { cycleWeapon(1, action === 'left' ? -1 : 1); stage.play('move'); }
-    else if (action === 'start') startFromSetup();
+    const items = p2Items(), cur = items.indexOf(document.querySelector('.nav-focus2'));
+    if (cur < 0) { setP2Focus(items.find(b => b.dataset.w === settings.weapons[1]) || items[0]); return true; }
+    if (action === 'up' || action === 'down' || action === 'left' || action === 'right') {
+      const next = pickNext(rects(items), cur, action);
+      if (next !== cur) { setP2Focus(items[next]); stage.play('move'); }
+    } else if (!repeat && action === 'ok') { stage.play('select'); items[cur].click(); }
+    else if (!repeat && action === 'start') startFromSetup();
     return true;
   }
   if (action === 'up' || action === 'down' || action === 'left' || action === 'right') {
     const items = focusables(), cur = items.indexOf(document.querySelector('.nav-focus'));
     if (cur < 0) { setFocus(items[0] || defaultFocus(activeScreen)); return true; }
-    const next = pickNext(items.map(b => { const r = b.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; }), cur, action);
+    const next = pickNext(rects(items), cur, action);
     if (next !== cur) { setFocus(items[next]); stage.play('move'); }
     return true;
   }
@@ -114,11 +131,6 @@ function onNav(action, src, repeat) {
     return true;
   }
   return false;
-}
-
-function cycleWeapon(p, d) {
-  settings.weapons[p] = WEAPON_IDS[(WEAPON_IDS.indexOf(settings.weapons[p]) + d + WEAPON_IDS.length) % WEAPON_IDS.length];
-  refreshSetup();
 }
 
 function buildTitle() {
@@ -143,7 +155,9 @@ function buildSetup() {
       if (b) { settings.weapons[p] = b.dataset.w; refreshSetup(); }
     };
   }
+  for (const r of document.querySelectorAll('#setup .roster')) r.style.setProperty('--cols', Math.ceil(WEAPON_IDS.length / 2));
   const maps = $('#setup .maps');
+  maps.style.setProperty('--cols', Math.ceil((MAP_IDS.length + 1) / 2));
   maps.innerHTML = MAP_IDS.map(id => `<button class="map" data-map="${id}"><img src="${theme.base + theme.maps[id].far}" alt=""><span>${MAPS[id].name}</span></button>`).join('')
     + `<button class="map" data-map="random"><div class="rand">?</div><span>랜덤</span></button>`;
   maps.onclick = e => { const b = e.target.closest('[data-map]'); if (b) { settings.map = b.dataset.map; refreshSetup(); } };
@@ -303,7 +317,7 @@ async function boot() {
   addEventListener('resize', onResize);
   document.addEventListener('visibilitychange', () => { if (document.hidden && game && !paused) setPaused(true); });
   $('#loading').hidden = true;
-  window.versus = { stage, get game() { return game; } }; // debugging handle
+  window.versus = { stage, input, nav, get game() { return game; } }; // debugging handle
   show('title');
   onResize();
   registerServiceWorker();

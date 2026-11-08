@@ -14,6 +14,7 @@ export function strike(f) {
   if (sh) return { ...sh, super: true };
   if (attackPhase(f) !== 'active' || f.attack.hit) return null;
   const { aerial, kind } = f.attack;
+  if (kind === 'charged' && f.stats.bow) return null; // the archer shoots instead (game.js spawns the arrow)
   const dmg = Math.round(f.stats.power * (aerial ? JUMP_ATTACK_MULT : kind === 'charged' ? CHARGE_MULT : 1));
   const reach = kind === 'long' ? f.stats.reach + LONG_REACH_BONUS : kind === 'heavy' ? f.stats.reach * HEAVY_REACH : kind === 'dive' ? DIVE_REACH : f.stats.reach;
   return { reach, dmg, kb: dmg * KNOCKBACK_PER_DMG, stun: HIT_STUN, aerial, kind, super: false };

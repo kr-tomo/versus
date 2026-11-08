@@ -54,10 +54,10 @@ test('long attack: connects where a normal attack falls short', () => {
   assert.equal(hits({ right: true }), 1);
 });
 
-test('heavy attack: only long-reach fighters, walking backward, shorter reach, same damage', () => {
+test('heavy attack: long-reach fighters (and taekwondo), walking backward, shorter reach, same damage', () => {
   for (const w of WEAPON_IDS) {
     const f = attackWith(w, { left: true });
-    assert.equal(f.attack.kind, canDoubleJump(w) ? 'normal' : 'heavy', w);
+    assert.equal(f.attack.kind, canDoubleJump(w) && !WEAPONS[w].heavy ? 'normal' : 'heavy', w);
   }
   const f = attackWith('spear', { left: true });
   while (!strike(f)) step(f, { ...NO_INPUT, left: true });

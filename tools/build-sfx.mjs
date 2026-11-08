@@ -67,6 +67,13 @@ const SFX = {
   move:   render(0.06, [{ type: 'square', freq: 880, d: 0.02, gain: 0.3 }]),
   select: render(0.16, [{ type: 'square', freq: 660, d: 0.03, gain: 0.3 }, { type: 'square', freq: 990, at: 0.05, d: 0.05, gain: 0.3 }]),
   back:   render(0.14, [{ type: 'square', freq: 520, d: 0.03, gain: 0.3 }, { type: 'square', freq: 350, at: 0.05, d: 0.05, gain: 0.3 }]),
+  // a gruff "hey!": buzzy voice with vowel formants and a falling pitch
+  shout:  render(0.7, [
+    { type: 'saw', freq: t => 190 - t * 90, a: 0.02, d: 0.35, gain: 0.5 }, { freq: t => 720 - t * 120, a: 0.02, d: 0.3, gain: 0.35 },
+    { freq: t => 1150 - t * 200, a: 0.02, d: 0.25, gain: 0.25 }, { type: 'noise', cut: () => 0.3, a: 0.01, d: 0.05, gain: 0.2 }]),
+  boom:   render(1.6, [{ type: 'noise', cut: t => 0.5 * Math.exp(-t * 3) + 0.03, a: 0.005, d: 0.45, gain: 1.6 }, { freq: t => 70 * Math.exp(-t * 1.2), d: 0.5, gain: 1.2 }, { type: 'square', freq: 38, d: 0.3, gain: 0.3 }]),
+  bow:    render(0.4, [{ type: 'saw', freq: t => 160 + Math.exp(-t * 30) * 300, a: 0.002, d: 0.12, gain: 0.5 }, { type: 'noise', cut: t => 0.2 + t, a: 0.03, d: 0.08, gain: 0.5 }]),
+  whirl:  render(1.0, [{ type: 'noise', cut: t => 0.08 + 0.06 * Math.sin(t * 40), a: 0.15, d: 0.4, gain: 1 }, { type: 'square', freq: t => 90 + Math.sin(t * 30) * 30, at: 0.3, d: 0.15, gain: 0.3 }, { type: 'noise', cut: () => 0.7, at: 0.45, d: 0.05, gain: 0.7 }]),
   win:    render(1.1, [523, 659, 784, 1047].map((f, i) => ({ type: 'square', freq: f, at: i * 0.12, d: i === 3 ? 0.4 : 0.1, gain: 0.3 })))
 };
 

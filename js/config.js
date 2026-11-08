@@ -1,7 +1,7 @@
 // Gameplay constants. Visuals live in themes/<id>/theme.json.
 
 // Shown on the title screen; keep in step with CACHE in sw.js.
-export const APP_VERSION = 'v7';
+export const APP_VERSION = 'v8';
 
 export const WORLD_W = 1280;
 export const VIEW_W = 640;
@@ -39,7 +39,12 @@ export const WEAPONS = {
   stag:    { name: '큰 턱',    power: 14, reach: 85,  startup: 0.17, active: 0.10, recovery: 0.26, move: 1.0,  guardUp: 0.08, airDash: true },
   genghis: { name: '청룡언월도', power: 22, reach: 140, startup: 0.36, active: 0.13, recovery: 0.46, move: 0.85, guardUp: 0.17, halfW: 26, height: 110 },
   mace:    { name: '철퇴',     power: 18, reach: 92,  startup: 0.30, active: 0.12, recovery: 0.40, move: 0.88, guardUp: 0.13 },
-  fork:    { name: '갈퀴',     power: 10, reach: 110, startup: 0.18, active: 0.10, recovery: 0.27, move: 1.0,  guardUp: 0.09 }
+  fork:    { name: '갈퀴',     power: 10, reach: 110, startup: 0.18, active: 0.10, recovery: 0.27, move: 1.0,  guardUp: 0.09 },
+  // taekwondo: dagger power/reach, speed between dagger (0.34s) and fist (0.27s); short reach but
+  // keeps the back-step attack (axe kick) as well as the double jump
+  tkd:     { name: '발차기',   power: 8,  reach: 45,  startup: 0.08, active: 0.085, recovery: 0.14, move: 1.12, guardUp: 0.035, heavy: true },
+  // Joseon archer: sword stats; the charged attack shoots an arrow instead of swinging
+  archer:  { name: '활·환도',   power: 12, reach: 75,  startup: 0.15, active: 0.10, recovery: 0.23, move: 1.0,  guardUp: 0.07, bow: true }
 };
 export const WEAPON_IDS = Object.keys(WEAPONS);
 export const MAX_POWER = Math.max(...WEAPON_IDS.map(w => WEAPONS[w].power));
@@ -98,6 +103,12 @@ export const AIR_DASH_DIST = 210;
 export const AIR_DASH_TIME = 0.26;
 export const AIR_DASH_ATTACK = 0.06;
 
+// Archer's charged shot: an arc up to 2/3 of the view width whose apex is 1.6x the body height.
+export const ARROW_RANGE = VIEW_W * 2 / 3;
+export const ARROW_APEX = 1.6;         // x body height, measured from the feet
+export const ARROW_SPEED = 620;        // horizontal px/s
+export const ARROW_MULT = 1.5;         // damage vs the normal attack
+
 // Supers. The user is invulnerable while it runs.
 //   dash: [from, to, speed] forward movement   blink: teleport behind the opponent at this time
 //   hits: at/len (window), reach, dmg, kb, stun; ub = ignores guard, crush = guard breaks (chip + stun),
@@ -125,7 +136,14 @@ export const SUPERS = {
     hits: [{ at: 0.25, len: 0.1, reach: 184, dmg: 34, kb: 420, stun: 1.1, ub: true, noEvade: true, tall: true, grab: true, launch: 620 }] },
   // a bull charges in from the screen edge behind the farmer and runs across the whole map
   fork: { name: '황소 돌격', time: 0.6, range: 2000, hits: [],
-    bull: { at: 0.2, speed: 950, dmg: 32, kb: 280, stun: 0.9, launch: 460 } }
+    bull: { at: 0.2, speed: 950, dmg: 32, kb: 280, stun: 0.9, launch: 460 } },
+  // thunder whirlwind: flies at an opponent within 3x reach in front (including above) and kicks
+  tkd: { name: '회오리 돌려차기', time: 0.9, range: 135, spin: true, hitFrame: 'longAtk',
+    seek: { at: 0.14, fly: 0.2, range: 135 },
+    hits: [{ at: 0.36, len: 0.14, reach: 40, dmg: 36, kb: 380, stun: 1.0, launch: 540, aerial: true, noEvade: true }] },
+  // artillery: a bigyeok-jincheollae is lobbed from behind the archer and bursts at the map center
+  archer: { name: '포격 지원', time: 0.7, range: 2000, hits: [],
+    bomb: { at: 0.3, flight: 1.15, radius: 150, apex: 260, dmg: 40, kb: 320, stun: 1.0, launch: 460 } }
 };
 
 // Per-map variables. Layout is regenerated every round inside these safe ranges.
@@ -134,7 +152,12 @@ export const MAPS = {
   lava:   { name: '용암 지대',   trap: '마그마 웅덩이', trapWidth: 90, traps: [2, 3], platforms: [2, 3], platformRise: [72, 92], trapDps: 10, ice: false },
   jungle: { name: '아마존 밀림', trap: '피라냐 우물',   trapWidth: 80, traps: [1, 2], platforms: [3, 4], platformRise: [70, 96], trapDps: 7,  ice: false },
   seoul:  { name: '서울 도심',   trap: '감전 맨홀',     trapWidth: 80, traps: [2, 2], platforms: [3, 3], platformRise: [76, 90], trapDps: 8,  ice: false },
-  tundra: { name: '북극 툰드라', trap: '얼음 구멍',     trapWidth: 90, traps: [2, 3], platforms: [2, 3], platformRise: [72, 92], trapDps: 6,  ice: true }
+  tundra: { name: '북극 툰드라', trap: '얼음 구멍',     trapWidth: 90, traps: [2, 3], platforms: [2, 3], platformRise: [72, 92], trapDps: 6,  ice: true },
+  ship:    { name: '판옥선 갑판', trap: '불붙은 갑판',   trapWidth: 90, traps: [2, 3], platforms: [2, 3], platformRise: [72, 92], trapDps: 9,  ice: false },
+  // trapReact: the trap art switches to its second frame only while someone stands in it
+  library: { name: '도서관',      trap: '경비 아저씨',   trapWidth: 80, traps: [1, 2], platforms: [3, 4], platformRise: [70, 94], trapDps: 7,  ice: false, trapReact: true },
+  rome:    { name: '로마',        trap: '사자 굴',       trapWidth: 90, traps: [2, 2], platforms: [2, 3], platformRise: [74, 92], trapDps: 9,  ice: false },
+  egypt:   { name: '이집트',      trap: '독사 굴',       trapWidth: 80, traps: [2, 3], platforms: [2, 3], platformRise: [72, 92], trapDps: 8,  ice: false }
 };
 export const MAP_IDS = Object.keys(MAPS);
 export const PLATFORM_WIDTHS = [120, 150, 180, 210];

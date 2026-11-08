@@ -57,7 +57,10 @@
         "flip": 34,
         "dive": 35,
         "chargeHold": 36,
-        "airDash": 37
+        "airDash": 37,
+        "chargeAtk": 38,
+        "bowDraw": 39,
+        "bowShot": 40
       }
     },
     "spear": {
@@ -115,7 +118,10 @@
         "flip": 34,
         "dive": 35,
         "chargeHold": 36,
-        "airDash": 37
+        "airDash": 37,
+        "chargeAtk": 38,
+        "bowDraw": 39,
+        "bowShot": 40
       }
     },
     "axe": {
@@ -173,7 +179,10 @@
         "flip": 34,
         "dive": 35,
         "chargeHold": 36,
-        "airDash": 37
+        "airDash": 37,
+        "chargeAtk": 38,
+        "bowDraw": 39,
+        "bowShot": 40
       }
     },
     "dagger": {
@@ -231,7 +240,10 @@
         "flip": 34,
         "dive": 35,
         "chargeHold": 36,
-        "airDash": 37
+        "airDash": 37,
+        "chargeAtk": 38,
+        "bowDraw": 39,
+        "bowShot": 40
       }
     },
     "fist": {
@@ -289,7 +301,10 @@
         "flip": 34,
         "dive": 35,
         "chargeHold": 36,
-        "airDash": 37
+        "airDash": 37,
+        "chargeAtk": 38,
+        "bowDraw": 39,
+        "bowShot": 40
       }
     },
     "stag": {
@@ -347,7 +362,10 @@
         "flip": 34,
         "dive": 35,
         "chargeHold": 36,
-        "airDash": 37
+        "airDash": 37,
+        "chargeAtk": 38,
+        "bowDraw": 39,
+        "bowShot": 40
       }
     },
     "genghis": {
@@ -405,7 +423,10 @@
         "flip": 34,
         "dive": 35,
         "chargeHold": 36,
-        "airDash": 37
+        "airDash": 37,
+        "chargeAtk": 38,
+        "bowDraw": 39,
+        "bowShot": 40
       }
     },
     "mace": {
@@ -463,7 +484,10 @@
         "flip": 34,
         "dive": 35,
         "chargeHold": 36,
-        "airDash": 37
+        "airDash": 37,
+        "chargeAtk": 38,
+        "bowDraw": 39,
+        "bowShot": 40
       }
     },
     "fork": {
@@ -521,7 +545,132 @@
         "flip": 34,
         "dive": 35,
         "chargeHold": 36,
-        "airDash": 37
+        "airDash": 37,
+        "chargeAtk": 38,
+        "bowDraw": 39,
+        "bowShot": 40
+      }
+    },
+    "tkd": {
+      "name": "한결",
+      "en": "Han Gyeol",
+      "title": "태권도 국가대표",
+      "color": "#1f4fa8",
+      "sheet": "characters/tkd.svg",
+      "portrait": "portraits/tkd.svg",
+      "cell": [
+        220,
+        190
+      ],
+      "origin": [
+        70,
+        180
+      ],
+      "cols": 6,
+      "scale": 0.8,
+      "frames": {
+        "idle0": 0,
+        "idle01": 1,
+        "idle1": 2,
+        "idle10": 3,
+        "walk0": 4,
+        "walk01": 5,
+        "walk1": 6,
+        "walk12": 7,
+        "walk2": 8,
+        "walk23": 9,
+        "walk3": 10,
+        "walk30": 11,
+        "windup0": 12,
+        "windup": 13,
+        "attack": 14,
+        "attack1": 15,
+        "guard0": 16,
+        "guard": 17,
+        "airGuard": 18,
+        "jump": 19,
+        "apex": 20,
+        "fall": 21,
+        "jumpAtk0": 22,
+        "jumpAtk": 23,
+        "hit": 24,
+        "hit0": 25,
+        "win": 26,
+        "win0": 27,
+        "longWind": 28,
+        "longAtk0": 29,
+        "longAtk": 30,
+        "heavyWind": 31,
+        "heavyAtk0": 32,
+        "heavyAtk": 33,
+        "flip": 34,
+        "dive": 35,
+        "chargeHold": 36,
+        "airDash": 37,
+        "chargeAtk": 38,
+        "bowDraw": 39,
+        "bowShot": 40
+      }
+    },
+    "archer": {
+      "name": "송무",
+      "en": "Song Mu",
+      "title": "조선 무관 궁수",
+      "color": "#c4362a",
+      "sheet": "characters/archer.svg",
+      "portrait": "portraits/archer.svg",
+      "cell": [
+        220,
+        190
+      ],
+      "origin": [
+        70,
+        180
+      ],
+      "cols": 6,
+      "scale": 0.8,
+      "frames": {
+        "idle0": 0,
+        "idle01": 1,
+        "idle1": 2,
+        "idle10": 3,
+        "walk0": 4,
+        "walk01": 5,
+        "walk1": 6,
+        "walk12": 7,
+        "walk2": 8,
+        "walk23": 9,
+        "walk3": 10,
+        "walk30": 11,
+        "windup0": 12,
+        "windup": 13,
+        "attack": 14,
+        "attack1": 15,
+        "guard0": 16,
+        "guard": 17,
+        "airGuard": 18,
+        "jump": 19,
+        "apex": 20,
+        "fall": 21,
+        "jumpAtk0": 22,
+        "jumpAtk": 23,
+        "hit": 24,
+        "hit0": 25,
+        "win": 26,
+        "win0": 27,
+        "longWind": 28,
+        "longAtk0": 29,
+        "longAtk": 30,
+        "heavyWind": 31,
+        "heavyAtk0": 32,
+        "heavyAtk": 33,
+        "flip": 34,
+        "dive": 35,
+        "chargeHold": 36,
+        "airDash": 37,
+        "chargeAtk": 38,
+        "bowDraw": 39,
+        "bowShot": 40
       }
     }
   },
@@ -657,6 +806,142 @@
         ]
       },
       "extras": {}
+    },
+    "ship": {
+      "far": "maps/ship/far.svg",
+      "ground": "maps/ship/ground.svg",
+      "trap": {
+        "sheet": "maps/ship/trap.svg",
+        "cell": [
+          130,
+          114
+        ],
+        "origin": [
+          20,
+          70
+        ],
+        "frames": 2,
+        "width": 90
+      },
+      "platforms": {
+        "sheet": "maps/ship/platforms.svg",
+        "cellH": 48,
+        "origin": [
+          4,
+          4
+        ],
+        "widths": [
+          120,
+          150,
+          180,
+          210
+        ]
+      },
+      "extras": {
+        "ropes": "#b89a6a"
+      }
+    },
+    "library": {
+      "far": "maps/library/far.svg",
+      "ground": "maps/library/ground.svg",
+      "trap": {
+        "sheet": "maps/library/trap.svg",
+        "cell": [
+          120,
+          189
+        ],
+        "origin": [
+          20,
+          145
+        ],
+        "frames": 2,
+        "width": 80
+      },
+      "platforms": {
+        "sheet": "maps/library/platforms.svg",
+        "cellH": 48,
+        "origin": [
+          4,
+          4
+        ],
+        "widths": [
+          120,
+          150,
+          180,
+          210
+        ]
+      },
+      "extras": {
+        "posts": "#5a3a20"
+      }
+    },
+    "rome": {
+      "far": "maps/rome/far.svg",
+      "ground": "maps/rome/ground.svg",
+      "trap": {
+        "sheet": "maps/rome/trap.svg",
+        "cell": [
+          130,
+          114
+        ],
+        "origin": [
+          20,
+          70
+        ],
+        "frames": 2,
+        "width": 90
+      },
+      "platforms": {
+        "sheet": "maps/rome/platforms.svg",
+        "cellH": 48,
+        "origin": [
+          4,
+          4
+        ],
+        "widths": [
+          120,
+          150,
+          180,
+          210
+        ]
+      },
+      "extras": {
+        "posts": "#e2d8c0"
+      }
+    },
+    "egypt": {
+      "far": "maps/egypt/far.svg",
+      "ground": "maps/egypt/ground.svg",
+      "trap": {
+        "sheet": "maps/egypt/trap.svg",
+        "cell": [
+          120,
+          114
+        ],
+        "origin": [
+          20,
+          70
+        ],
+        "frames": 2,
+        "width": 80
+      },
+      "platforms": {
+        "sheet": "maps/egypt/platforms.svg",
+        "cellH": 48,
+        "origin": [
+          4,
+          4
+        ],
+        "widths": [
+          120,
+          150,
+          180,
+          210
+        ]
+      },
+      "extras": {
+        "posts": "#c9a46a"
+      }
     }
   },
   "extras": {

@@ -82,9 +82,9 @@ h2 { margin: 0; font-size: calc(var(--u) * 5); }
 .side[data-player="0"] .who { color: var(--p1); }
 .side[data-player="1"] .who { color: var(--p2); }
 .vs { font-weight: 900; font-size: calc(var(--u) * 6); color: var(--accent); }
-.roster { display: flex; gap: calc(var(--u) * 1); }
+.roster { display: grid; grid-template-columns: repeat(var(--cols, 6), auto); gap: calc(var(--u) * .8); }
 .portrait {
-  --s: calc(var(--u) * 7);
+  --s: calc(var(--u) * 7.4);
   width: var(--s); padding: 0; border-radius: 10px; overflow: hidden; background: var(--panel); border: 3px solid var(--line);
   display: flex; flex-direction: column; align-items: center;
 }
@@ -99,14 +99,14 @@ h2 { margin: 0; font-size: calc(var(--u) * 5); }
 .info .super { text-align: center; color: var(--accent); font-weight: 700; font-size: calc(var(--u) * 2.2); margin-top: calc(var(--u) * .6); }
 .bars i { height: calc(var(--u) * 1.2); background: #2c2838; border-radius: 4px; overflow: hidden; }
 .bars b { display: block; height: 100%; background: var(--accent); }
-.maps { display: flex; gap: calc(var(--u) * 1.4); justify-content: center; }
+.maps { display: grid; grid-template-columns: repeat(var(--cols, 5), auto); gap: calc(var(--u) * 1) calc(var(--u) * 1.2); justify-content: center; }
 .map {
-  width: calc(var(--u) * 21); padding: 0; border-radius: 10px; overflow: hidden; background: var(--panel); border: 3px solid var(--line);
+  width: calc(var(--u) * 17); padding: 0; border-radius: 10px; overflow: hidden; background: var(--panel); border: 3px solid var(--line);
   display: flex; flex-direction: column;
 }
-.map img, .map .rand { width: 100%; height: calc(var(--u) * 9); object-fit: cover; object-position: 40% 70%; display: block; }
+.map img, .map .rand { width: 100%; height: calc(var(--u) * 6.2); object-fit: cover; object-position: 40% 70%; display: block; }
 .map .rand { display: flex; align-items: center; justify-content: center; font-size: calc(var(--u) * 6); font-weight: 900; color: var(--accent); background: repeating-linear-gradient(45deg, #2a2536 0 10px, #241f30 10px 20px); }
-.map span { font-size: calc(var(--u) * 2.4); font-weight: 700; padding: 3px 0; }
+.map span { font-size: calc(var(--u) * 2.1); font-weight: 700; padding: 2px 0; }
 .map.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 footer { display: flex; gap: calc(var(--u) * 2); align-items: stretch; }
 footer .toggle { display: flex; flex-direction: column; align-items: center; line-height: 1.1; min-width: calc(var(--u) * 16); }
@@ -117,6 +117,8 @@ footer .primary { background: linear-gradient(#ffcf6b, #ff9a1f); color: #2a1300;
 #result h2 small { display: block; font-size: .4em; color: var(--text); margin-top: 6px; }
 /* ---------- gamepad / keyboard focus ---------- */
 body.nav .nav-focus { outline: 3px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(255,179,71,.55), 0 0 18px rgba(255,179,71,.6); position: relative; z-index: 1; }
+/* the second pad's cursor (2P setup) */
+body.nav .nav-focus2 { outline: 3px dashed var(--p2); outline-offset: 2px; box-shadow: 0 0 14px rgba(255,90,90,.7); position: relative; z-index: 1; }
 body.nav .menu button.nav-focus, body.nav footer button.nav-focus { transform: scale(1.04); }
 #hints {
   position: fixed; left: 50%; bottom: max(env(safe-area-inset-bottom), 6px); transform: translateX(-50%); z-index: 20;

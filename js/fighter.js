@@ -114,7 +114,7 @@ export function stepFighter(f, input, dt, world) {
     let kind = 'normal';
     if (!f.onGround) kind = f.doubled && f.canDouble ? 'dive' : 'aerial';
     else if (held === f.facing) kind = 'long';
-    else if (held === -f.facing && !f.canDouble) kind = 'heavy';
+    else if (held === -f.facing && (!f.canDouble || f.stats.heavy)) kind = 'heavy';
     f.attack = { t: 0, kind, aerial: !f.onGround, hit: false, held: true };
   }
   if (canAct && !f.attack && f.onGround && pressed('jump')) { f.vy = -JUMP_V; f.onGround = false; f.platform = -1; }
@@ -140,6 +140,7 @@ export function stepFighter(f, input, dt, world) {
   const target = dir * WALK_SPEED * f.stats.move * speed;
   const diving = f.attack?.kind === 'dive' && f.attack.landed === undefined;
   if (f.ko) f.vx = approach(f.vx, 0, ICE_DECEL * dt);
+  else if (f.super?.hover) { f.vx = 0; f.vy = 0; }   // carried by the super (game.js moves it)
   else if (f.super) f.vx = dash ? dash[2] * f.facing : f.onGround ? 0 : f.vx;
   else if (diving) { f.vx = f.facing * DIVE_SPEED * Math.SQRT1_2; f.vy = DIVE_SPEED * Math.SQRT1_2; }
   else if (dashing(f)) { f.vx = f.airDash.dir * AIR_DASH_DIST / AIR_DASH_TIME; f.vy = 0; }
@@ -154,7 +155,7 @@ export function stepFighter(f, input, dt, world) {
   // vertical movement and landing (platforms are one-way)
   const prevY = f.y;
   if (!f.onGround) {
-    if (!diving && !dashing(f)) f.vy += GRAVITY * dt;
+    if (!diving && !dashing(f) && !f.super?.hover) f.vy += GRAVITY * dt;
     f.y += f.vy * dt;
     if (f.vy >= 0) {
       if (f.drop <= 0) {
@@ -189,7 +190,8 @@ export function frameName(f) {
   if (f.super) {
     const hits = f.super.def.hits, t = f.super.t;
     if (!hits.length) return t < f.super.def.time * 0.4 ? 'windup' : 'win'; // summons: a call, then a pointing pose
-    if (hits.some(h => t >= h.at && t < h.at + h.len)) return f.onGround ? 'attack' : 'jumpAtk';
+    if (f.super.flying) return 'flip';
+    if (hits.some(h => t >= h.at && t < h.at + h.len)) return f.super.def.hitFrame ?? (f.onGround ? 'attack' : 'jumpAtk');
     if (t < hits[0].at) return 'windup';
     return hits.some(h => h.at > t) ? 'windup' : 'attack';
   }
@@ -199,7 +201,8 @@ export function frameName(f) {
     const k = f.attack.kind, { startup, active, recovery } = attackTiming(f), t = f.attack.t;
     const early = ph === 'startup' && t < startup * 0.45, rec = (t - startup - active) / recovery;
     if (k === 'dive') return ph === 'recovery' ? 'hit0' : 'dive';
-    if (k === 'charged') return ph === 'startup' ? (Math.floor(t / 0.08) % 2 ? 'heavyWind' : 'chargeHold') : ph === 'active' || rec < 0.4 ? 'heavyAtk' : 'attack1';
+    if (k === 'charged' && f.stats.bow) return ph === 'startup' ? 'bowDraw' : rec < 0.6 ? 'bowShot' : 'attack1';
+    if (k === 'charged') return ph === 'startup' ? (Math.floor(t / 0.08) % 2 ? 'heavyWind' : 'chargeHold') : ph === 'active' || rec < 0.4 ? 'chargeAtk' : 'attack1';
     if (k === 'aerial') return ph === 'startup' ? (early ? 'jump' : 'jumpAtk0') : 'jumpAtk';
     if (k === 'long') return ph === 'startup' ? (early ? 'longWind' : 'longAtk0') : ph === 'active' || rec < 0.4 ? 'longAtk' : 'attack1';
     if (k === 'heavy') return ph === 'startup' ? (t < startup * 0.6 ? 'heavyWind' : 'heavyAtk0') : ph === 'active' || rec < 0.5 ? 'heavyAtk' : 'attack1';

@@ -37,13 +37,14 @@ for (const c of CHARS) {
   };
 }
 
-const TRAP_PAD = 20, TRAP_TOP = 70, TRAP_H = 114, TRAP_FRAMES = 2;
+const TRAP_PAD = 20, TRAP_FRAMES = 2;
 const PLAT_TOP = 4, PLAT_H = 48;
 for (const [id, art] of Object.entries(MAP_ART)) {
   write(`maps/${id}/far.svg`, svg(1280, 360, art.far()));
   write(`maps/${id}/ground.svg`, svg(1280, 44, art.ground(), '0 316 1280 44'));
 
-  const tw = MAPS[id].trapWidth, cw = tw + TRAP_PAD * 2;
+  // trapTop: headroom above the ground (the library guard stands tall behind his floor)
+  const tw = MAPS[id].trapWidth, cw = tw + TRAP_PAD * 2, TRAP_TOP = art.trapTop || 70, TRAP_H = TRAP_TOP + 44;
   let traps = '';
   for (let fr = 0; fr < TRAP_FRAMES; fr++) traps += `<g transform="translate(${fr * cw + TRAP_PAD} ${TRAP_TOP})">${art.trap(tw, fr)}</g>`;
   write(`maps/${id}/trap.svg`, svg(cw * TRAP_FRAMES, TRAP_H, traps));

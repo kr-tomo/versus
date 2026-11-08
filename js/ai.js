@@ -1,4 +1,4 @@
-import { BODY_HALF_W, SUPER_MAX, SUPERS, LONG_REACH_BONUS, HEAVY_REACH } from './config.js';
+import { BODY_HALF_W, SUPER_MAX, SUPERS, LONG_REACH_BONUS, HEAVY_REACH, ARROW_RANGE, WORLD_W } from './config.js';
 import { attackPhase } from './fighter.js';
 
 // guard: chance to notice an incoming attack; guardLag: extra delay before raising the guard
@@ -60,12 +60,21 @@ export class AI {
       return;
     }
 
-    // full gauge and in range: fire the super
-    if (me.meter >= SUPER_MAX && me.onGround && !me.attack && gap <= SUPERS[me.weapon].range && r() < p.superUse) { this.charging = true; return; }
+    // full gauge and in range: fire the super (the artillery waits for the opponent near the map center)
+    const sup = SUPERS[me.weapon];
+    const superReady = sup.bomb ? Math.abs(op.x - WORLD_W / 2) < sup.bomb.radius * 0.7 : gap <= sup.range;
+    if (me.meter >= SUPER_MAX && me.onGround && !me.attack && superReady && r() < p.superUse) { this.charging = true; return; }
+    // archer at a distance: hold attack for the charged bow shot
+    if (me.stats.bow && me.onGround && !me.attack && gap > 160 && gap < ARROW_RANGE * 0.9 && Math.abs(op.y - me.y) < 60 && r() < p.attack * 0.4) {
+      const s = me.stats;
+      this.holdAttack = s.startup + s.active + s.recovery + 0.55;
+      inp.attack = true;
+      return;
+    }
 
     if (!me.attack && me.onGround) {
       // long-reach fighters crowded up close: back off with an armored heavy swing
-      if (!me.canDouble && gap <= myReach * HEAVY_REACH * 0.8 && gap < myReach * 0.5 && r() < p.attack * 0.35) { inp.attack = true; move(-dir); return; }
+      if ((!me.canDouble || me.stats.heavy) && gap <= myReach * HEAVY_REACH * 0.8 && gap < myReach * 0.5 && r() < p.attack * 0.35) { inp.attack = true; move(-dir); return; }
       // just out of normal reach: step in with a long attack
       if (gap > myReach * 0.9 && gap <= myReach + LONG_REACH_BONUS + 10 && r() < p.attack * 0.5) { inp.attack = true; move(dir); return; }
     }

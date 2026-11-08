@@ -7,6 +7,7 @@
     "build:sprites": "node tools/build-sprites.mjs",
     "test": "node --test tests/*.test.mjs",
     "serve": "node tools/serve.mjs 8080",
-    "build:sfx": "node tools/build-sfx.mjs"
+    "build:sfx": "node tools/build-sfx.mjs",
+    "serve:https": "node tools/serve.mjs 8443 --https"
   }
 }

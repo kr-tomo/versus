@@ -1,11 +1,11 @@
 // Precache the whole app per version and serve only from that cache, so files of two versions
 // never mix. A new version arrives by changing CACHE; the page reloads once when it takes over.
-const CACHE = 'versus-v7';
+const CACHE = 'versus-v8';
 const THEME = 'themes/classic/';
-const CHARS = ['sword', 'spear', 'axe', 'dagger', 'fist', 'stag', 'genghis', 'mace', 'fork'];
-const MAPS = ['lava', 'jungle', 'seoul', 'tundra'];
+const CHARS = ['sword', 'spear', 'axe', 'dagger', 'fist', 'stag', 'genghis', 'mace', 'fork', 'tkd', 'archer'];
+const MAPS = ['lava', 'jungle', 'seoul', 'tundra', 'ship', 'library', 'rome', 'egypt'];
 const SFX = ['swing', 'swingHeavy', 'hit', 'hitHeavy', 'guard', 'miss', 'jump', 'land', 'charge', 'super', 'quake', 'ko',
-  'round', 'fight', 'trade', 'trap', 'move', 'select', 'back', 'win'];
+  'round', 'fight', 'trade', 'trap', 'move', 'select', 'back', 'win', 'shout', 'boom', 'bow', 'whirl'];
 const PRECACHE = [
   './', 'index.html', 'style.css', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-180.png',
   ...['main', 'config', 'layout', 'mapgen', 'camera', 'fighter', 'combat', 'ai', 'input', 'assets', 'stage', 'menu', 'game'].map(m => `js/${m}.js`),

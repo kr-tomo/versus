@@ -8,7 +8,7 @@ import { loadImage, rasterize } from './assets.js';
 import { INTRO_TIME } from './game.js';
 
 export const SFX = ['swing', 'swingHeavy', 'hit', 'hitHeavy', 'guard', 'miss', 'jump', 'land', 'charge', 'super', 'quake', 'ko',
-  'round', 'fight', 'trade', 'trap', 'move', 'select', 'back', 'win'];
+  'round', 'fight', 'trade', 'trap', 'move', 'select', 'back', 'win', 'shout', 'boom', 'bow', 'whirl'];
 const STEP = 1 / 120;
 const MAX_TEX = 4096;
 const FONT = '"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif';
@@ -26,7 +26,11 @@ const MAP_FX = {
   lava:   { dust: 0x6a4a3a, debris: 0x4a3328, trap: [0xffd23f, 0xff6a1f, 0xd8261b], ambient: 'embers' },
   jungle: { dust: 0x7a5a36, debris: 0x5e4426, trap: [0x9fe0ff, 0x4aa8d8, 0xffffff], ambient: 'leaves' },
   seoul:  { dust: 0x8a8a92, debris: 0x7c7c84, trap: [0xffffff, 0x8ff3ff, 0x4fb6ff], ambient: null },
-  tundra: { dust: 0xdbeaf5, debris: 0xbfe2ff, trap: [0xffffff, 0xbfe8ff, 0x7cc4f0], ambient: 'snow' }
+  tundra: { dust: 0xdbeaf5, debris: 0xbfe2ff, trap: [0xffffff, 0xbfe8ff, 0x7cc4f0], ambient: 'snow' },
+  ship:    { dust: 0xb08a5a, debris: 0x7a5230, trap: [0xffd23f, 0xff7a1a, 0xc2410c], ambient: 'embers' },
+  library: { dust: 0xc8b08a, debris: 0x8a5a32, trap: [0xffe066, 0xffffff, 0xffd23f], ambient: null },
+  rome:    { dust: 0xe0d0aa, debris: 0xc8b890, trap: [0xc8a46a, 0x8a6a3a, 0xffffff], ambient: null },
+  egypt:   { dust: 0xe8c482, debris: 0xc49a5a, trap: [0xe8c482, 0x8aa83a, 0xc49a5a], ambient: null }
 };
 
 /* ---------- procedural textures ---------- */
@@ -63,6 +67,21 @@ function makeFxTextures(scene) {
   canvasTexture(scene, 'fx-rock', 14, 12, ctx => {
     ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(2, 4); ctx.lineTo(7, 1); ctx.lineTo(13, 4); ctx.lineTo(11, 11); ctx.lineTo(3, 10); ctx.closePath(); ctx.fill(); ctx.stroke();
+  });
+  canvasTexture(scene, 'fx-arrow', 40, 10, ctx => {
+    ctx.strokeStyle = '#2a1a10'; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(2, 5); ctx.lineTo(32, 5); ctx.stroke();
+    ctx.strokeStyle = '#c9a46a'; ctx.lineWidth = 1.8; ctx.stroke();
+    ctx.fillStyle = '#cdd3da'; ctx.beginPath(); ctx.moveTo(30, 1.5); ctx.lineTo(39, 5); ctx.lineTo(30, 8.5); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#d0262e'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(2, 5); ctx.lineTo(-2, 1); ctx.moveTo(2, 5); ctx.lineTo(-2, 9); ctx.moveTo(7, 5); ctx.lineTo(3, 1); ctx.moveTo(7, 5); ctx.lineTo(3, 9); ctx.stroke();
+  });
+  // bigyeok-jincheollae: a round iron shell with a lit fuse
+  canvasTexture(scene, 'fx-bomb', 40, 40, ctx => {
+    const g = ctx.createRadialGradient(15, 17, 2, 20, 22, 16);
+    g.addColorStop(0, '#8a8f98'); g.addColorStop(1, '#22252b');
+    ctx.fillStyle = g; ctx.strokeStyle = '#111'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(20, 22, 15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#5a5f68'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(20, 22, 15, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    ctx.strokeStyle = '#7a4a1a'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(20, 7); ctx.quadraticCurveTo(24, 2, 30, 4); ctx.stroke();
   });
   canvasTexture(scene, 'fx-leaf', 14, 8, ctx => {
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(7, 4, 6.5, 3, 0, 0, Math.PI * 2); ctx.fill();
@@ -161,6 +180,9 @@ class FightScene extends Phaser.Scene {
     this.debris = this.physics.add.group({ bounceX: 0.3, bounceY: 0.42, dragX: 90, maxSize: 60 });
     this.physics.add.collider(this.debris, this.solids, (d) => { if (Math.abs(d.body.velocity.y) < 40) d.setAngularVelocity(d.body.angularVelocity * 0.6); });
 
+    this.arrows = []; this.bombs = [];
+    this.whirl = this.add.graphics().setDepth(13);
+    this.fuse = this.add.particles(0, 0, 'fx-dot', { emitting: false, lifespan: 260, speed: { min: 20, max: 70 }, scale: { start: 0.25, end: 0 }, blendMode: 'ADD', tint: [0xffe27a, 0xff8a1a] }).setDepth(21);
     const bx = theme.extras.bull;
     this.bullSprite = this.add.sprite(0, 0, sh.bull.key, 'b0').setOrigin(bx.origin[0] / bx.cell[0], bx.origin[1] / bx.cell[1]).setDepth(12).setVisible(false);
     this.fighters = this.model.settings.weapons.map((w, i) => {
@@ -317,6 +339,28 @@ class FightScene extends Phaser.Scene {
         cam.shake(160, 0.009);
         this.sfx('hitHeavy', { volume: 0.7, rate: 1.2 });
         this.sfx('guard', { volume: 0.6, rate: 0.6 });
+      } else if (e.type === 'scold') {
+        // the library guard yells; sound rings burst from his spot
+        const t = g.layout.traps.find(tr => e.x > tr.x && e.x < tr.x + tr.w), gx = t ? t.x + t.w / 2 : e.x;
+        for (let k = 0; k < 3; k++) this.time.delayedCall(k * 110, () => this.ring(gx + 8, GROUND_Y - 90, 0xffffff, 1.2 + k * 0.5));
+        this.popText('쉿! 뛰지 마!', gx, GROUND_Y - 150, '#ff5a3c', 16);
+        cam.shake(160, 0.004);
+        this.sfx('shout', { volume: 0.8 });
+      } else if (e.type === 'explosion') {
+        cam.flash(220, 255, 220, 160);
+        cam.shake(600, 0.022);
+        this.fx.spark.explode(46, e.x, e.y - 30);
+        this.fx.smoke.explode(28, e.x, e.y - 40);
+        this.fx.dust.explode(24, e.x, e.y);
+        for (const k of [1, 1.8, 2.6]) this.ring(e.x, e.y - 30, 0xffb347, k * e.r / 60);
+        this.flashStar(e.x, e.y - 40, 3, 0xfff0b0);
+        this.spawnDebris(e.x, e.y - 6, 14, 0);
+        this.pulseVignette(0.6);
+        this.sfx('boom');
+      } else if (e.type === 'arrowStuck') {
+        this.fx.dust.explode(3, e.x, e.y);
+        const a = this.add.image(e.x, e.y - 4, 'fx-arrow').setRotation(e.dir > 0 ? 0.6 : Math.PI - 0.6).setDepth(6);
+        this.tweens.add({ targets: a, alpha: 0, delay: 500, duration: 300, onComplete: () => a.destroy() });
       } else if (e.type === 'bull') {
         cam.shake(700, 0.006);
         this.sfx('quake', { volume: 0.8 });
@@ -375,11 +419,13 @@ class FightScene extends Phaser.Scene {
       }
       // stag beetle air dash: a streak of afterimage dust
       if (f.airDash && !p.airDash) { this.ring(f.x, f.y - 40, 0xffd27a, 0.9); this.sfx('miss', { volume: 0.5, rate: 1.4 }); }
+      if (f.attack?.fired && !p.fired) this.sfx('bow', { volume: 0.7 });
+      if (f.super?.def.spin && !p.spin) this.sfx('whirl', { volume: 0.7 });
       // charged attack: a rising hum while it charges
       if (f.attack?.kind === 'charged' && p.attack?.kind !== 'charged') this.sfx('charge', { volume: 0.35, rate: 1.6 });
       // super dash: dust trail from the feet
       if (f.super && f.onGround && Math.abs(f.vx) > 150 && Math.random() < 0.5) this.fx.dust.explode(2, f.x - f.facing * 10, f.y);
-      Object.assign(p, { airDash: f.airDash, attack: f.attack, onGround: f.onGround, vy: f.vy, charge: f.charge, ko: f.ko, doubled: f.doubled, diveLanded: f.attack?.landed });
+      Object.assign(p, { fired: f.attack?.fired, spin: !!f.super?.def.spin, airDash: f.airDash, attack: f.attack, onGround: f.onGround, vy: f.vy, charge: f.charge, ko: f.ko, doubled: f.doubled, diveLanded: f.attack?.landed });
     });
 
     if (g.phase !== this.lastPhase) {
@@ -432,7 +478,12 @@ class FightScene extends Phaser.Scene {
     const g = this.model, cam = this.cameras.main;
     this.updateFocus(dt);
     const tf = Math.floor(g.t * 3) % 2;
-    for (const s of this.traps || []) s.setFrame(`f${tf}`);
+    const react = g.map.trapReact;
+    (this.traps || []).forEach((s, k) => {
+      const t = g.layout.traps[k];
+      // the library guard only turns to yell while someone stands on his yellow floor
+      s.setFrame(`f${react ? (g.fighters.some(f => f.inTrap && f.x > t.x && f.x < t.x + t.w) ? 1 : 0) : tf}`);
+    });
 
     this.shadows.clear();
     g.fighters.forEach((f, i) => {
@@ -447,7 +498,7 @@ class FightScene extends Phaser.Scene {
         v.sprite.setOrigin(ox, oy).setPosition(f.x - f.facing * 6, f.y - 10).setRotation(-f.facing * Math.PI / 2 * r);
       } else if (frame === 'flip') {
         // somersault around the body center
-        const h = height(f), r = ease(Math.min(1, f.flipT / FLIP_TIME));
+        const h = height(f), r = f.super ? f.super.t * 3 : ease(Math.min(1, f.flipT / FLIP_TIME));
         v.sprite.setOrigin(ox, (c.origin[1] - h / 2 / c.scale) / c.cell[1]).setPosition(f.x, f.y - h / 2).setRotation(f.facing * Math.PI * 2 * r);
       } else v.sprite.setOrigin(ox, oy).setPosition(f.x, f.y).setRotation(0);
       // hit flash: solid white for a moment, then blink
@@ -474,6 +525,8 @@ class FightScene extends Phaser.Scene {
       if (f.attack?.kind === 'charged' && f.attack.t < 0.5) v.charge.emitParticle(1);
       if (f.charge > 0) v.charge.emitParticle(2);
     });
+    this.syncProjectiles(g);
+    this.drawWhirl(g);
     const bull = g.bull, bs = this.bullSprite, bx = this.theme.extras.bull;
     bs.setVisible(!!bull);
     if (bull) {
@@ -482,6 +535,55 @@ class FightScene extends Phaser.Scene {
     }
     this.drawHud();
     this.sortCameras();
+  }
+
+  syncProjectiles(g) {
+    const arrows = g.projectiles.filter(p => p.type === 'arrow'), bombs = g.projectiles.filter(p => p.type === 'bomb');
+    while (this.arrows.length < arrows.length) this.arrows.push(this.add.image(0, 0, 'fx-arrow').setDepth(14));
+    while (this.bombs.length < bombs.length) this.bombs.push(this.add.image(0, 0, 'fx-bomb').setDepth(14).setScale(0.8));
+    this.arrows.forEach((img, k) => {
+      const p = arrows[k];
+      img.setVisible(!!p);
+      if (!p) return;
+      // nose follows the arc: slope of h(u) over the horizontal run
+      const dh = (2 * p.a * p.u + p.b) / p.range;
+      img.setPosition(p.x, p.y).setRotation(p.dir > 0 ? -Math.atan(dh) : Math.PI + Math.atan(dh));
+    });
+    this.bombs.forEach((img, k) => {
+      const p = bombs[k];
+      img.setVisible(!!p);
+      if (!p) return;
+      img.setPosition(p.x, p.y).setRotation(p.t * 6);
+      this.fuse.emitParticle(1, p.x + 4, p.y - 14);
+    });
+  }
+
+  // Thunder whirlwind around a taekwondo fighter during the super.
+  drawWhirl(g) {
+    const w = this.whirl;
+    w.clear();
+    for (const f of g.fighters) {
+      if (!f.super?.def.spin) continue;
+      const t = f.super.t, fade = Math.min(1, (f.super.def.time - t) * 4, t * 6), h = height(f);
+      const cx = f.x, cy = f.y - h / 2;
+      for (let k = 0; k < 5; k++) {
+        const rx = 26 + k * 9, ry = 7 + k * 2.4, y = cy + 34 - k * 17, a = t * 14 + k;
+        w.lineStyle(3 - k * 0.3, 0xcfe8ff, 0.75 * fade);
+        w.beginPath();
+        for (let s = 0; s <= 24; s++) { const th = a + s / 24 * Math.PI * 1.6; w.lineTo(cx + Math.cos(th) * rx, y + Math.sin(th) * ry); }
+        w.strokePath();
+      }
+      // lightning forks
+      if (Math.floor(t * 20) % 3 !== 0) {
+        w.lineStyle(2.5, 0xfff36a, fade);
+        for (let k = 0; k < 2; k++) {
+          let x = cx + (Math.random() - 0.5) * 70, y = cy - 60;
+          w.beginPath(); w.moveTo(x, y);
+          for (let s = 0; s < 5; s++) { x += (Math.random() - 0.5) * 26; y += 20; w.lineTo(x, y); }
+          w.strokePath();
+        }
+      }
+    }
   }
 
   // Super close-up: zoom on the user, dim the stage and slide in cinema bars; ease back after.

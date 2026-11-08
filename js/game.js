@@ -1,11 +1,27 @@
 import {
   MAPS, MAP_IDS, VIEW_W, WORLD_W, SPAWN_X, BODY_HALF_W, BODY_H, GROUND_Y,
-  HIT_CONFIRM, HITSTOP_BASE, HITSTOP_PER_DMG, HITSTOP_MAX, HITSTOP_GUARD
+  HIT_CONFIRM, HITSTOP_BASE, HITSTOP_PER_DMG, HITSTOP_MAX, HITSTOP_GUARD, HIT_STUN, KNOCKBACK_PER_DMG,
+  ARROW_RANGE, ARROW_APEX, ARROW_SPEED, ARROW_MULT
 } from './config.js';
-import { createFighter, stepFighter, NO_INPUT, dashing } from './fighter.js';
+import { createFighter, stepFighter, NO_INPUT, dashing, attackPhase } from './fighter.js';
 import { detectHits, confirmHit } from './combat.js';
 import { constrainCamera } from './camera.js';
 import { generateMap } from './mapgen.js';
+
+// Arc through (x, hand height) → apex ARROW_APEX x body height → ground at ARROW_RANGE.
+// h(u) = a·u² + b·u + c over u = 0..1 with h(0) = c, h(1) = 0 and max h = H.
+export function arrowArc(c, H) {
+  const k = 4 * H - 2 * c, a = (-k - Math.sqrt(k * k - 4 * c * c)) / 2;
+  return { a, b: -c - a, c };
+}
+
+function makeArrow(f, owner) {
+  const h = f.stats.height ?? BODY_H, hand = h * 0.68;
+  return {
+    type: 'arrow', owner, dir: f.facing, x0: f.x + f.facing * 16, x: f.x, feet: f.y, y: f.y - hand, u: 0,
+    range: ARROW_RANGE, dmg: Math.round(f.stats.power * ARROW_MULT), ...arrowArc(hand, h * ARROW_APEX), t: 0
+  };
+}
 
 // Bodies push each other apart; jumping over the opponent is still possible.
 export function separate(a, b) {
@@ -48,6 +64,7 @@ export class Game {
     this.pending = [];
     this.hitstop = 0;
     this.bull = null;
+    this.projectiles = [];
   }
 
   get world() { return { platforms: this.layout.platforms, ice: this.map.ice }; }
@@ -86,6 +103,19 @@ export class Game {
         me.super.quaked = true;
         this.effects.push({ type: 'quake', x: me.x, y: me.y, dir: me.facing, t: 0 });
       }
+      this.updateSeek(me, op, dt);
+      const bomb = me.super?.def.bomb;
+      if (bomb && !me.super.summoned && me.super.t >= bomb.at) {
+        // lobbed from behind the archer (off to the rear) toward the middle of the map
+        me.super.summoned = true;
+        const x0 = Math.max(-120, Math.min(WORLD_W + 120, me.x - me.facing * 360));
+        this.projectiles.push({ type: 'bomb', owner: i, x0, x: x0, y: GROUND_Y - 60, t: 0, ...bomb });
+      }
+      // the archer's charged shot leaves the bow as the release frame starts
+      if (me.attack?.kind === 'charged' && me.stats.bow && !me.attack.fired && attackPhase(me) === 'active') {
+        me.attack.fired = true;
+        this.projectiles.push(makeArrow(me, i));
+      }
       const bull = me.super?.def.bull;
       if (bull && !me.super.summoned && me.super.t >= bull.at) {
         // the bull enters from the screen edge behind the farmer and runs the whole map
@@ -99,6 +129,7 @@ export class Game {
     this.cam = constrainCamera(this.cam, a, b);
 
     this.updateBull(dt, live);
+    this.updateProjectiles(dt, live);
     if (live) {
       this.resolveContacts(dt);
       for (const f of this.fighters) this.applyTrap(f, dt);
@@ -118,6 +149,68 @@ export class Game {
 
   setPhase(p) { this.phase = p; this.phaseT = 0; }
 
+  // Whirlwind kick: at seek.at, an opponent in front within range (or above) pulls the kicker to it.
+  updateSeek(me, op, dt) {
+    const sk = me.super?.def.seek, sp = me.super;
+    if (!sk) return;
+    if (!sp.sought && sp.t >= sk.at) {
+      sp.sought = true;
+      const dx = (op.x - me.x) * me.facing, hw = (me.stats.halfW ?? BODY_HALF_W) + (op.stats.halfW ?? BODY_HALF_W);
+      if (!op.ko && dx > -hw && dx - hw <= sk.range && op.y <= me.y + 10) {
+        sp.hover = true; sp.flying = true;
+        sp.from = { x: me.x, y: me.y };
+        sp.to = { x: op.x - me.facing * (hw + 6), y: op.y };
+        me.onGround = false; me.platform = -1;
+      }
+    }
+    if (sp.flying) {
+      const u = Math.min(1, (sp.t - sk.at) / sk.fly), e = u * (2 - u);
+      me.x = sp.from.x + (sp.to.x - sp.from.x) * e;
+      me.y = sp.from.y + (sp.to.y - sp.from.y) * e;
+      if (u >= 1) sp.flying = false;
+    }
+  }
+
+  // Arrows and the artillery bomb.
+  updateProjectiles(dt, live) {
+    for (const p of this.projectiles) {
+      p.t += dt;
+      const op = this.fighters[1 - p.owner], hw = op.stats.halfW ?? BODY_HALF_W, h = op.stats.height ?? BODY_H;
+      if (p.type === 'arrow') {
+        p.u += ARROW_SPEED * dt / p.range;
+        p.x = p.x0 + p.dir * p.u * p.range;
+        p.y = p.feet - (p.a * p.u * p.u + p.b * p.u + p.c);
+        const inside = Math.abs(op.x - p.x) < hw + 4 && p.y > op.y - h - 4 && p.y < op.y + 2;
+        if (live && !op.ko && !op.super && !dashing(op) && inside) {
+          p.done = true;
+          const s = { kind: 'charged', dmg: p.dmg, kb: p.dmg * KNOCKBACK_PER_DMG, stun: HIT_STUN };
+          this.hitFrom({ facing: p.dir, x: p.x, stats: {} }, op, s, p.x, 1 - p.owner);
+        } else if (p.u >= 1) { p.done = true; this.effects.push({ type: 'arrowStuck', x: p.x, y: GROUND_Y, dir: p.dir, t: 0, life: 0.8 }); }
+      } else if (p.type === 'bomb') {
+        const u = Math.min(1, p.t / p.flight), cx = WORLD_W / 2;
+        p.x = p.x0 + (cx - p.x0) * u;
+        p.y = GROUND_Y - 60 * (1 - u) - p.apex * 4 * u * (1 - u);
+        if (u >= 1) {
+          p.done = true;
+          this.effects.push({ type: 'explosion', x: cx, y: GROUND_Y, r: p.radius, t: 0, life: 1.0 });
+          if (live && !op.ko && !op.super && !dashing(op) && Math.abs(op.x - cx) < p.radius + hw && op.y > GROUND_Y - 220) {
+            const s = { dmg: p.dmg, kb: p.kb, stun: p.stun, launch: p.launch, super: true, index: 0, noEvade: true };
+            this.hitFrom({ facing: op.x >= cx ? 1 : -1, x: cx, stats: {} }, op, s, op.x, 1 - p.owner);
+          }
+        }
+      }
+    }
+    this.projectiles = this.projectiles.filter(p => !p.done && p.x > -300 && p.x < WORLD_W + 300);
+  }
+
+  // Applies a hit that doesn't come from a fighter's own hitbox (arrows, bombs, the bull).
+  hitFrom(att, def, s, x, who) {
+    const e = confirmHit({ att, def, s, x }, this.rand, { lateGuard: def.guarding });
+    this.effects.push({ type: e.evaded ? 'miss' : e.broken ? 'break' : e.guarded ? 'guard' : 'hit', who, big: !!s.super || e.damage >= 18, x: e.x, y: e.y, dmg: e.damage, dir: att.facing, t: 0 });
+    if (!e.evaded) this.hitstop = Math.max(this.hitstop, e.guarded ? HITSTOP_GUARD : Math.min(HITSTOP_MAX, HITSTOP_BASE + e.damage * HITSTOP_PER_DMG));
+    return e;
+  }
+
   updateBull(dt, live) {
     const bull = this.bull;
     if (!bull) return;
@@ -129,10 +222,7 @@ export class Game {
     if (live && !bull.hit && !op.ko && !op.super && !dashing(op) && Math.abs(op.x - bull.x) < 50 + hw && op.y > GROUND_Y - 70) {
       bull.hit = true;
       const s = { dmg: bull.dmg, kb: bull.kb, stun: bull.stun, launch: bull.launch, super: true, index: 0 };
-      const att = { facing: bull.dir, x: bull.x, stats: {} };
-      const e = confirmHit({ att, def: op, s, x: op.x }, this.rand, { lateGuard: op.guarding });
-      this.effects.push({ type: e.evaded ? 'miss' : e.guarded ? 'guard' : 'hit', who: 1 - bull.owner, big: true, x: e.x, y: e.y, dmg: e.damage, dir: bull.dir, t: 0 });
-      if (!e.evaded) this.hitstop = Math.max(this.hitstop, HITSTOP_MAX);
+      this.hitFrom({ facing: bull.dir, x: bull.x, stats: {} }, op, s, op.x, 1 - bull.owner);
     }
     if (bull.x < -200 || bull.x > WORLD_W + 200) this.bull = null;
   }
@@ -159,6 +249,7 @@ export class Game {
 
   applyTrap(f, dt) {
     const onTrap = f.onGround && f.platform < 0 && this.layout.traps.some(t => f.x > t.x + 4 && f.x < t.x + t.w - 4);
+    if (onTrap && !f.inTrap && this.map.trapReact) this.effects.push({ type: 'scold', x: f.x, who: this.fighters.indexOf(f), t: 0, life: 1.1 });
     f.inTrap = onTrap;
     if (!onTrap) { f.trapAcc = 0; return; }
     f.trapAcc += dt * this.map.trapDps;

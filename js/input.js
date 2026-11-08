@@ -2,6 +2,29 @@
 
 const blank = () => ({ left: false, right: false, jump: false, down: false, attack: false, guard: false });
 
+// One pad → logical buttons. Handles the standard mapping plus controllers that report a
+// non-standard layout (d-pad on axes 6/7 or a hat switch on axis 9), and analog-only buttons.
+export function readPad(pad, dead = 0.5) {
+  const b = i => { const x = pad.buttons[i]; return !!x && (x.pressed || x.value > 0.5); };
+  const ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
+  let hx = 0, hy = 0;
+  if (pad.mapping !== 'standard') {
+    if (pad.axes.length > 7) { hx = Math.round(pad.axes[6] || 0); hy = Math.round(pad.axes[7] || 0); }
+    const hat = pad.axes[9];
+    if (hat !== undefined && hat >= -1.05 && hat <= 1.05) {
+      // 8-way hat: -1 up, -0.71 up-right, -0.43 right, … 0.71 left (anything > 1 is centered)
+      const dir = Math.round((hat + 1) / (2 / 7));
+      hx = [0, 1, 1, 1, 0, -1, -1, -1][dir] ?? 0;
+      hy = [-1, -1, 0, 1, 1, 1, 0, -1][dir] ?? 0;
+    }
+  }
+  return {
+    up: b(12) || ay < -dead - 0.05 || hy < 0, down: b(13) || ay > dead + 0.05 || hy > 0,
+    left: b(14) || ax < -dead || hx < 0, right: b(15) || ax > dead || hx > 0,
+    a: b(0), b: b(1), x: b(2), y: b(3), lb: b(4), rb: b(5), select: b(8), start: b(9)
+  };
+}
+
 const KEYMAP = [
   { KeyA: 'left', KeyD: 'right', KeyW: 'jump', KeyS: 'down', KeyF: 'attack', KeyG: 'guard' },
   { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'jump', ArrowDown: 'down', KeyK: 'attack', KeyL: 'guard' }
@@ -65,19 +88,18 @@ export class InputManager {
     for (const map of maps) for (const [code, action] of Object.entries(map)) if (this.keys.has(code)) s[action] = true;
     const pad = this.pads()[player];
     if (pad && player < this.players) {
-      const b = i => pad.buttons[i]?.pressed;
-      const ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
-      s.left ||= b(14) || ax < -0.5;
-      s.right ||= b(15) || ax > 0.5;
-      s.jump ||= b(12) || ay < -0.6;
-      s.down ||= b(13) || ay > 0.6;
-      s.attack ||= b(0);
-      s.guard ||= b(1);
+      const p = readPad(pad);
+      s.left ||= p.left;
+      s.right ||= p.right;
+      s.jump ||= p.up;
+      s.down ||= p.down;
+      s.attack ||= p.a;
+      s.guard ||= p.b;
     }
     return s;
   }
 
   padPressed(button) {
-    return this.pads().some(p => p.buttons[button]?.pressed);
+    return this.pads().some(p => { const x = p.buttons[button]; return !!x && (x.pressed || x.value > 0.5); });
   }
 }

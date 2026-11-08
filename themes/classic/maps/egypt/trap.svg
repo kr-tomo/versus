@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="114" viewBox="0 0 240 114"><g transform="translate(20 70)"><rect x="0" y="0" width="80" height="44" fill="#3a2614"/>
+      <path d="M0 30 Q20 22 40 30 T80 30 V44 H0 Z" fill="#5a3e20"/>
+      <g transform="translate(22.400000000000002 30) scale(1 1)">
+  <path d="M0 14 Q-8 0 0 -12 Q6 -18 2 -24" stroke="#18131f" stroke-width="9" fill="none" stroke-linecap="round"/>
+  <path d="M0 14 Q-8 0 0 -12 Q6 -18 2 -24" stroke="#6a8a2a" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  <path d="M-9 -18 Q2 -34 13 -18 Q2 -12 -9 -18 Z" fill="#8aa83a" stroke="#18131f" stroke-width="1.8"/>
+  <circle cx="5" cy="-26" r="1.6" fill="#ffd23f"/>
+  
+</g><g transform="translate(57.599999999999994 30) scale(-1 1)">
+  <path d="M0 14 Q-8 0 0 -26 Q6 -34 2 -40" stroke="#18131f" stroke-width="9" fill="none" stroke-linecap="round"/>
+  <path d="M0 14 Q-8 0 0 -26 Q6 -34 2 -40" stroke="#6a8a2a" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  <path d="M-9 -34 Q2 -52 13 -34 Q2 -28 -9 -34 Z" fill="#8aa83a" stroke="#18131f" stroke-width="1.8"/>
+  <circle cx="5" cy="-42" r="1.6" fill="#ffd23f"/>
+  <path d="M8 -42 l8 2 l-2 3 M8 -42 l8 -1" stroke="#d0262e" stroke-width="1.5" fill="none"/>
+</g>
+      <path d="M-4 0 L2 44 M84 0 L78 44" stroke="#b8904e" stroke-width="6"/>
+      <path d="M-6 0 h92" stroke="#9a7238" stroke-width="3"/></g><g transform="translate(140 70)"><rect x="0" y="0" width="80" height="44" fill="#3a2614"/>
+      <path d="M0 30 Q20 22 40 30 T80 30 V44 H0 Z" fill="#5a3e20"/>
+      <g transform="translate(22.400000000000002 30) scale(1 1)">
+  <path d="M0 14 Q-8 0 0 -26 Q6 -34 2 -40" stroke="#18131f" stroke-width="9" fill="none" stroke-linecap="round"/>
+  <path d="M0 14 Q-8 0 0 -26 Q6 -34 2 -40" stroke="#6a8a2a" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  <path d="M-9 -34 Q2 -52 13 -34 Q2 -28 -9 -34 Z" fill="#8aa83a" stroke="#18131f" stroke-width="1.8"/>
+  <circle cx="5" cy="-42" r="1.6" fill="#ffd23f"/>
+  <path d="M8 -42 l8 2 l-2 3 M8 -42 l8 -1" stroke="#d0262e" stroke-width="1.5" fill="none"/>
+</g><g transform="translate(57.599999999999994 30) scale(-1 1)">
+  <path d="M0 14 Q-8 0 0 -12 Q6 -18 2 -24" stroke="#18131f" stroke-width="9" fill="none" stroke-linecap="round"/>
+  <path d="M0 14 Q-8 0 0 -12 Q6 -18 2 -24" stroke="#6a8a2a" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  <path d="M-9 -18 Q2 -34 13 -18 Q2 -12 -9 -18 Z" fill="#8aa83a" stroke="#18131f" stroke-width="1.8"/>
+  <circle cx="5" cy="-26" r="1.6" fill="#ffd23f"/>
+  
+</g>
+      <path d="M-4 0 L2 44 M84 0 L78 44" stroke="#b8904e" stroke-width="6"/>
+      <path d="M-6 0 h92" stroke="#9a7238" stroke-width="3"/></g></svg>
