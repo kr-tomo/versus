@@ -1,7 +1,7 @@
 // Gameplay constants. Visuals live in themes/<id>/theme.json.
 
 // Shown on the title screen; keep in step with CACHE in sw.js.
-export const APP_VERSION = 'v8';
+export const APP_VERSION = 'v9';
 
 export const WORLD_W = 1280;
 export const VIEW_W = 640;
@@ -42,7 +42,9 @@ export const WEAPONS = {
   fork:    { name: '갈퀴',     power: 10, reach: 110, startup: 0.18, active: 0.10, recovery: 0.27, move: 1.0,  guardUp: 0.09 },
   // taekwondo: dagger power/reach, speed between dagger (0.34s) and fist (0.27s); short reach but
   // keeps the back-step attack (axe kick) as well as the double jump
-  tkd:     { name: '발차기',   power: 8,  reach: 45,  startup: 0.08, active: 0.085, recovery: 0.14, move: 1.12, guardUp: 0.035, heavy: true },
+  // heavyHold: the axe kick holds the leg at head height before chopping; backKick: the charged
+  // attack turns the body around into a back kick
+  tkd:     { name: '발차기',   power: 8,  reach: 45,  startup: 0.08, active: 0.085, recovery: 0.14, move: 1.12, guardUp: 0.035, heavy: true, heavyHold: 0.2, backKick: true },
   // Joseon archer: sword stats; the charged attack shoots an arrow instead of swinging
   archer:  { name: '활·환도',   power: 12, reach: 75,  startup: 0.15, active: 0.10, recovery: 0.23, move: 1.0,  guardUp: 0.07, bow: true }
 };
@@ -103,9 +105,9 @@ export const AIR_DASH_DIST = 210;
 export const AIR_DASH_TIME = 0.26;
 export const AIR_DASH_ATTACK = 0.06;
 
-// Archer's charged shot: an arc up to 2/3 of the view width whose apex is 1.6x the body height.
+// Archer's charged shot: an arc up to 2/3 of the view width whose apex is 1.2x the body height.
 export const ARROW_RANGE = VIEW_W * 2 / 3;
-export const ARROW_APEX = 1.6;         // x body height, measured from the feet
+export const ARROW_APEX = 1.2;         // x body height, measured from the feet
 export const ARROW_SPEED = 620;        // horizontal px/s
 export const ARROW_MULT = 1.5;         // damage vs the normal attack
 
@@ -141,9 +143,10 @@ export const SUPERS = {
   tkd: { name: '회오리 돌려차기', time: 0.9, range: 135, spin: true, hitFrame: 'longAtk',
     seek: { at: 0.14, fly: 0.2, range: 135 },
     hits: [{ at: 0.36, len: 0.14, reach: 40, dmg: 36, kb: 380, stun: 1.0, launch: 540, aerial: true, noEvade: true }] },
-  // artillery: a bigyeok-jincheollae is lobbed from behind the archer and bursts at the map center
+  // artillery: a bigyeok-jincheollae is lobbed from behind the archer and bursts at the center of
+  // the current view (radius 150 x 1.5)
   archer: { name: '포격 지원', time: 0.7, range: 2000, hits: [],
-    bomb: { at: 0.3, flight: 1.15, radius: 150, apex: 260, dmg: 40, kb: 320, stun: 1.0, launch: 460 } }
+    bomb: { at: 0.3, flight: 1.15, radius: 225, apex: 260, dmg: 40, kb: 320, stun: 1.0, launch: 460 } }
 };
 
 // Per-map variables. Layout is regenerated every round inside these safe ranges.

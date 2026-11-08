@@ -106,10 +106,10 @@ export class Game {
       this.updateSeek(me, op, dt);
       const bomb = me.super?.def.bomb;
       if (bomb && !me.super.summoned && me.super.t >= bomb.at) {
-        // lobbed from behind the archer (off to the rear) toward the middle of the map
+        // lobbed from behind the archer (off to the rear) toward the middle of the current view
         me.super.summoned = true;
         const x0 = Math.max(-120, Math.min(WORLD_W + 120, me.x - me.facing * 360));
-        this.projectiles.push({ type: 'bomb', owner: i, x0, x: x0, y: GROUND_Y - 60, t: 0, ...bomb });
+        this.projectiles.push({ type: 'bomb', owner: i, x0, x: x0, cx: this.cam + VIEW_W / 2, y: GROUND_Y - 60, t: 0, ...bomb });
       }
       // the archer's charged shot leaves the bow as the release frame starts
       if (me.attack?.kind === 'charged' && me.stats.bow && !me.attack.fired && attackPhase(me) === 'active') {
@@ -187,7 +187,7 @@ export class Game {
           this.hitFrom({ facing: p.dir, x: p.x, stats: {} }, op, s, p.x, 1 - p.owner);
         } else if (p.u >= 1) { p.done = true; this.effects.push({ type: 'arrowStuck', x: p.x, y: GROUND_Y, dir: p.dir, t: 0, life: 0.8 }); }
       } else if (p.type === 'bomb') {
-        const u = Math.min(1, p.t / p.flight), cx = WORLD_W / 2;
+        const u = Math.min(1, p.t / p.flight), cx = p.cx;
         p.x = p.x0 + (cx - p.x0) * u;
         p.y = GROUND_Y - 60 * (1 - u) - p.apex * 4 * u * (1 - u);
         if (u >= 1) {

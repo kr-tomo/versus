@@ -3,7 +3,7 @@
 // adding engine-side effects (particles, Arcade-physics debris, camera FX, filters, sound).
 import * as Phaser from '../vendor/phaser-4.2.1.esm.min.js';
 import { VIEW_W, VIEW_H, WORLD_W, GROUND_Y, PARALLAX, MAX_ENERGY, SUPER_MAX, SUPER_HOLD, BODY_HALF_W, BODY_H, FLIP_TIME } from './config.js';
-import { frameName } from './fighter.js';
+import { frameName, turnScale } from './fighter.js';
 import { loadImage, rasterize } from './assets.js';
 import { INTRO_TIME } from './game.js';
 
@@ -34,6 +34,7 @@ const MAP_FX = {
 };
 
 /* ---------- procedural textures ---------- */
+function rngLocal(seed) { return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
 function canvasTexture(scene, key, w, h, draw) {
   if (scene.textures.exists(key)) return;
   const c = document.createElement('canvas');
@@ -82,6 +83,16 @@ function makeFxTextures(scene) {
     ctx.beginPath(); ctx.arc(20, 22, 15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.strokeStyle = '#5a5f68'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(20, 22, 15, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
     ctx.strokeStyle = '#7a4a1a'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(20, 7); ctx.quadraticCurveTo(24, 2, 30, 4); ctx.stroke();
+  });
+  // a jagged lightning bolt with a soft blue glow, pointing down
+  canvasTexture(scene, 'fx-bolt', 64, 256, ctx => {
+    const r = rngLocal(5), pts = [[32, 0]];
+    for (let y = 22; y < 256; y += 18 + r() * 14) pts.push([32 + (r() - 0.5) * 34, y]);
+    pts.push([30 + (r() - 0.5) * 10, 256]);
+    const stroke = (w, c, blur) => { ctx.shadowBlur = blur; ctx.shadowColor = '#7fc8ff'; ctx.strokeStyle = c; ctx.lineWidth = w; ctx.lineJoin = 'round'; ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); };
+    stroke(12, 'rgba(120,190,255,.35)', 18); stroke(6, '#bfe4ff', 10); stroke(2.5, '#ffffff', 4);
+    // two side forks
+    for (const k of [3, 6]) { const [x, y] = pts[Math.min(k, pts.length - 1)]; ctx.lineWidth = 2; ctx.strokeStyle = '#dff2ff'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (k % 2 ? 18 : -18), y + 26); ctx.lineTo(x + (k % 2 ? 12 : -24), y + 44); ctx.stroke(); }
   });
   canvasTexture(scene, 'fx-leaf', 14, 8, ctx => {
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(7, 4, 6.5, 3, 0, 0, Math.PI * 2); ctx.fill();
@@ -149,18 +160,22 @@ class FightScene extends Phaser.Scene {
     const [far, ground, trap, plats, bull, ...chars] = await Promise.all([
       sheet(base + m.far, mapScale), sheet(base + m.ground, mapScale), sheet(base + m.trap.sheet, mapScale), sheet(base + m.platforms.sheet, mapScale),
       sheet(base + t.extras.bull.sheet, charScale),
-      ...this.model.settings.weapons.map(w => sheet(base + t.characters[w].sheet, charScale))
+      ...this.model.settings.weapons.map(w => Promise.all(t.characters[w].sheets.map(p => sheet(base + p, charScale))))
     ]);
     const bc = t.extras.bull.cell;
     for (let fr = 0; fr < t.extras.bull.frames; fr++) if (!bull.tex.has(`b${fr}`)) bull.tex.add(`b${fr}`, 0, fr * bc[0] * bull.k, 0, bc[0] * bull.k, bc[1] * bull.k);
     const tw = m.trap.cell[0], th = m.trap.cell[1];
     for (let fr = 0; fr < m.trap.frames; fr++) if (!trap.tex.has(`f${fr}`)) trap.tex.add(`f${fr}`, 0, fr * tw * trap.k, 0, tw * trap.k, th * trap.k);
     m.platforms.widths.forEach((w, i) => { if (!plats.tex.has(`w${w}`)) plats.tex.add(`w${w}`, 0, 0, i * m.platforms.cellH * plats.k, (w + 8) * plats.k, m.platforms.cellH * plats.k); });
+    // character frames live on several sheet pages; remember which page holds each frame
     this.model.settings.weapons.forEach((w, i) => {
-      const c = t.characters[w], s = chars[i];
+      const c = t.characters[w], pages = chars[i];
+      pages.pageOf = {};
       for (const [name, idx] of Object.entries(c.frames)) {
+        const s = pages[Math.floor(idx / c.perPage)], local = idx % c.perPage;
+        pages.pageOf[name] = s.key;
         if (s.tex.has(name)) continue;
-        const col = idx % c.cols, row = Math.floor(idx / c.cols);
+        const col = local % c.cols, row = Math.floor(local / c.cols);
         s.tex.add(name, 0, col * c.cell[0] * s.k, row * c.cell[1] * s.k, c.cell[0] * s.k, c.cell[1] * s.k);
       }
     });
@@ -182,12 +197,15 @@ class FightScene extends Phaser.Scene {
 
     this.arrows = []; this.bombs = [];
     this.whirl = this.add.graphics().setDepth(13);
+    // electric sparks crackling around the thunder whirlwind
+    this.zap = this.add.particles(0, 0, 'fx-dot', { emitting: false, lifespan: { min: 120, max: 260 }, speed: { min: 80, max: 260 }, scale: { start: 0.3, end: 0 },
+      blendMode: 'ADD', tint: [0xffffff, 0x9fdcff, 0xfff36a] }).setDepth(14);
     this.fuse = this.add.particles(0, 0, 'fx-dot', { emitting: false, lifespan: 260, speed: { min: 20, max: 70 }, scale: { start: 0.25, end: 0 }, blendMode: 'ADD', tint: [0xffe27a, 0xff8a1a] }).setDepth(21);
     const bx = theme.extras.bull;
     this.bullSprite = this.add.sprite(0, 0, sh.bull.key, 'b0').setOrigin(bx.origin[0] / bx.cell[0], bx.origin[1] / bx.cell[1]).setDepth(12).setVisible(false);
     this.fighters = this.model.settings.weapons.map((w, i) => {
-      const c = theme.characters[w], s = sh.chars[i];
-      const mk = () => this.add.sprite(0, 0, s.key, 'idle0').setOrigin(c.origin[0] / c.cell[0], c.origin[1] / c.cell[1]);
+      const c = theme.characters[w], pages = sh.chars[i], s = pages[0];
+      const mk = () => this.add.sprite(0, 0, pages.pageOf.idle0, 'idle0').setOrigin(c.origin[0] / c.cell[0], c.origin[1] / c.cell[1]);
       const ghosts = [0, 1, 2].map(() => mk().setVisible(false).setDepth(9).setTint(0xffd27a).setTintMode(Phaser.TintModes.ADD));
       const aura = this.add.image(0, 0, 'fx-aura').setBlendMode(Phaser.BlendModes.ADD).setDepth(9).setVisible(false);
       const sprite = mk().setDepth(10);
@@ -199,7 +217,7 @@ class FightScene extends Phaser.Scene {
         emitZone: { type: 'edge', source: new Phaser.Geom.Circle(0, 0, 70), quantity: 24 },
         emitCallback: p => { p.velocityX = -p.x / 0.32; p.velocityY = -p.y / 0.32; }
       }).setDepth(11);
-      return { c, k: s.k, sprite, ghosts, aura, glow, charge };
+      return { c, k: s.k, pageOf: pages.pageOf, sprite, ghosts, aura, glow, charge };
     });
 
     const P = (cfg) => this.add.particles(0, 0, cfg.texture || 'fx-dot', { emitting: false, ...cfg }).setDepth(cfg.depth ?? 20);
@@ -302,6 +320,14 @@ class FightScene extends Phaser.Scene {
       if (this.seen.has(e)) continue;
       this.seen.add(e);
       const dir = e.dir ?? 1;
+      // the whirlwind kick lands: a thunderbolt strikes the target
+      if (e.type === 'hit' && e.who !== undefined && g.fighters[1 - e.who]?.super?.def.spin) {
+        this.bolt(e.x, e.y + 40, 1.4);
+        this.bolt(e.x - 26, e.y + 40, 0.9); this.bolt(e.x + 26, e.y + 40, 0.9);
+        cam.flash(220, 200, 230, 255);
+        this.zap.explode(40, e.x, e.y);
+        this.sfx('boom', { volume: 0.7, rate: 1.4 });
+      }
       if (e.type === 'hit') {
         const big = e.big || e.dmg >= 18;
         this.fx.spark.setEmitterAngle?.({ min: dir > 0 ? -70 : 110, max: dir > 0 ? 70 : 250 });
@@ -368,6 +394,14 @@ class FightScene extends Phaser.Scene {
         this.popText('동시타격!', e.x, e.y, '#ff8a5a', 18);
         this.ring(e.x, e.y + 40, 0xffffff, 1.6);
         this.sfx('trade');
+      } else if (e.type === 'super' && g.fighters[e.who].super?.def.spin) {
+        // thunder whirlwind: bolts rain around the kicker as it winds up
+        const f = g.fighters[e.who];
+        cam.flash(160, 190, 225, 255);
+        for (let k = 0; k < 5; k++) this.time.delayedCall(k * 70, () => this.bolt(f.x + (Math.random() - 0.5) * 120, f.y, 0.7 + Math.random() * 0.4));
+        this.ring(f.x, f.y - height(f) / 2, 0x9fdcff, 2.2);
+        this.pulseVignette(0.5);
+        this.sfx('super');
       } else if (e.type === 'super') {
         const f = g.fighters[e.who];
         cam.flash(180, 255, 240, 200);
@@ -489,9 +523,10 @@ class FightScene extends Phaser.Scene {
     g.fighters.forEach((f, i) => {
       const y = this.surfaceBelow(f), k = clamp(1 - (y - f.y) / 220, 0.35, 1), w = 20 * halfW(f) / BODY_HALF_W;
       this.shadows.fillStyle(0x000000, 0.35).fillEllipse(f.x, y + 1, w * 2 * k, 10 * k);
-      const v = this.fighters[i], c = v.c, sx = f.facing * c.scale / v.k, sy = c.scale / v.k;
-      const frame = frameName(f);
-      v.sprite.setFrame(frame).setScale(sx, sy).setDepth(f.attack || f.super ? 11 : 10);
+      // turnScale < 0 shows the back (taekwondo back kick); passing through 0 reads as spinning around
+      const v = this.fighters[i], c = v.c, sx = f.facing * turnScale(f) * c.scale / v.k, sy = c.scale / v.k;
+      const frame = frameName(f), show = (spr) => spr.texture.key === v.pageOf[frame] ? spr.setFrame(frame) : spr.setTexture(v.pageOf[frame], frame);
+      show(v.sprite).setScale(sx, sy).setDepth(f.attack || f.super ? 11 : 10);
       const ox = c.origin[0] / c.cell[0], oy = c.origin[1] / c.cell[1];
       if (f.ko) {
         const r = Math.min(1, (f.t - f.koAt) * 4);
@@ -512,7 +547,7 @@ class FightScene extends Phaser.Scene {
       const dashing = (f.super || f.airDash?.t < 0.3) && Math.abs(f.vx) > 100;
       v.ghosts.forEach((gh, n) => {
         gh.setVisible(dashing);
-        if (dashing) gh.setFrame(frame).setScale(sx, sy).setPosition(f.x - f.vx * 0.025 * (n + 1), f.y).setAlpha(0.32 - n * 0.09);
+        if (dashing) show(gh).setScale(sx, sy).setPosition(f.x - f.vx * 0.025 * (n + 1), f.y).setAlpha(0.32 - n * 0.09);
       });
       // aura while the gauge is full, charging or in a super
       const full = f.meter >= SUPER_MAX && !f.ko;
@@ -559,6 +594,15 @@ class FightScene extends Phaser.Scene {
   }
 
   // Thunder whirlwind around a taekwondo fighter during the super.
+  // A lightning bolt striking down onto (x, groundY).
+  bolt(x, y, s = 1) {
+    const b = this.add.image(x, y, 'fx-bolt').setOrigin(0.5, 1).setScale(s * 0.9, s).setBlendMode(Phaser.BlendModes.ADD).setDepth(15)
+      .setFlipX(Math.random() < 0.5);
+    this.tweens.add({ targets: b, alpha: { from: 1, to: 0 }, duration: 260, ease: 'Stepped', easeParams: [4], onComplete: () => b.destroy() });
+    this.zap.explode(10, x, y - 4);
+    this.fx.dust.explode(4, x, y);
+  }
+
   drawWhirl(g) {
     const w = this.whirl;
     w.clear();
@@ -566,6 +610,11 @@ class FightScene extends Phaser.Scene {
       if (!f.super?.def.spin) continue;
       const t = f.super.t, fade = Math.min(1, (f.super.def.time - t) * 4, t * 6), h = height(f);
       const cx = f.x, cy = f.y - h / 2;
+      // blue core glow and crackling sparks; a bolt strikes nearby every few frames
+      w.fillStyle(0x7fc8ff, 0.18 * fade).fillEllipse(cx, cy, 120, 150);
+      w.fillStyle(0xffffff, 0.12 * fade).fillEllipse(cx, cy, 60, 90);
+      this.zap.emitParticle(2, cx + (Math.random() - 0.5) * 60, cy + (Math.random() - 0.5) * 70);
+      if (Math.random() < 0.12 * fade) this.bolt(cx + (Math.random() - 0.5) * 140, Math.min(GROUND_Y, f.y + 4), 0.5 + Math.random() * 0.4);
       for (let k = 0; k < 5; k++) {
         const rx = 26 + k * 9, ry = 7 + k * 2.4, y = cy + 34 - k * 17, a = t * 14 + k;
         w.lineStyle(3 - k * 0.3, 0xcfe8ff, 0.75 * fade);

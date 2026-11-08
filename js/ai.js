@@ -1,4 +1,4 @@
-import { BODY_HALF_W, SUPER_MAX, SUPERS, LONG_REACH_BONUS, HEAVY_REACH, ARROW_RANGE, WORLD_W } from './config.js';
+import { BODY_HALF_W, SUPER_MAX, SUPERS, LONG_REACH_BONUS, HEAVY_REACH, ARROW_RANGE, VIEW_W } from './config.js';
 import { attackPhase } from './fighter.js';
 
 // guard: chance to notice an incoming attack; guardLag: extra delay before raising the guard
@@ -60,9 +60,9 @@ export class AI {
       return;
     }
 
-    // full gauge and in range: fire the super (the artillery waits for the opponent near the map center)
+    // full gauge and in range: fire the super (the artillery waits for the opponent near the view center)
     const sup = SUPERS[me.weapon];
-    const superReady = sup.bomb ? Math.abs(op.x - WORLD_W / 2) < sup.bomb.radius * 0.7 : gap <= sup.range;
+    const superReady = sup.bomb ? Math.abs(op.x - (game.cam + VIEW_W / 2)) < sup.bomb.radius * 0.7 : gap <= sup.range;
     if (me.meter >= SUPER_MAX && me.onGround && !me.attack && superReady && r() < p.superUse) { this.charging = true; return; }
     // archer at a distance: hold attack for the charged bow shot
     if (me.stats.bow && me.onGround && !me.attack && gap > 160 && gap < ARROW_RANGE * 0.9 && Math.abs(op.y - me.y) < 60 && r() < p.attack * 0.4) {

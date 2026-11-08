@@ -133,13 +133,16 @@ const DERIVED = {
   chargeHold:{ from: ['heavyWind', 'heavyWind', 0], add: { lean: -4, tilt: -3 }, set: { fTh: 48, fSh: -6, bTh: -40, bSh: -30 } },
   airDash:   { from: ['jump', 'jump', 0], add: { lean: 50 }, set: { fTh: -40, fSh: -75, bTh: -62, bSh: -95, fUp: 95, fFo: 100, bUp: 85, bFo: 95 } },
   chargeAtk: { from: ['heavyAtk', 'heavyAtk', 0] },
+  backTurn:  { from: ['chargeHold', 'chargeHold', 0] },
+  backKick:  { from: ['chargeAtk', 'chargeAtk', 0] },
   // bow frames (only the archer swaps in the bow; the rest render them like an extended guard)
   bowDraw:   { from: ['idle0', 'idle0', 0], add: { lean: -3 }, set: { fUp: 90, fFo: 92, bUp: 72, bFo: -48, w: 0, wB: 0, fTh: 34, fSh: 0, bTh: -24, bSh: -14 } },
   bowShot:   { from: ['idle0', 'idle0', 0], add: { lean: -1 }, set: { fUp: 90, fFo: 92, bUp: 35, bFo: -95, w: 0, wB: 0, fTh: 34, fSh: 0, bTh: -24, bSh: -14 } }
 };
 
-// Sprite frames: key poses plus in-betweens [name, from, to, mix] — twice the old frame count.
-const FRAME_DEFS = [
+// Sprite frames: key poses and named in-betweens [name, from, to, mix]. Every motion is a chain of
+// poses; a midpoint frame `a>b` is generated between each neighbouring pair (twice the frames).
+const BASE_FRAMES = [
   ['idle0'], ['idle01', 'idle0', 'idle1', 0.5], ['idle1'], ['idle10', 'idle1', 'idle0', 0.5],
   ['walk0'], ['walk01', 'walk0', 'walk1', 0.5], ['walk1'], ['walk12', 'walk1', 'walk2', 0.5],
   ['walk2'], ['walk23', 'walk2', 'walk3', 0.5], ['walk3'], ['walk30', 'walk3', 'walk0', 0.5],
@@ -149,8 +152,28 @@ const FRAME_DEFS = [
   ['hit'], ['hit0', 'hit', 'idle0', 0.5], ['win'], ['win0', 'win', 'idle0', 0.35],
   ['longWind'], ['longAtk0', 'longWind', 'longAtk', 0.5], ['longAtk'],
   ['heavyWind'], ['heavyAtk0', 'heavyWind', 'heavyAtk', 0.5], ['heavyAtk'],
-  ['flip'], ['dive'], ['chargeHold'], ['airDash'], ['chargeAtk'], ['bowDraw'], ['bowShot']
+  ['flip'], ['dive'], ['chargeHold'], ['airDash'], ['chargeAtk'], ['bowDraw'], ['bowShot'],
+  ['backTurn'], ['backKick']
 ];
+export const MOTION_CHAINS = [
+  ['idle0', 'idle01', 'idle1', 'idle10', 'idle0'],
+  ['walk0', 'walk01', 'walk1', 'walk12', 'walk2', 'walk23', 'walk3', 'walk30', 'walk0'],
+  ['idle0', 'windup0', 'windup', 'attack', 'attack1', 'idle0'],
+  ['idle0', 'guard0', 'guard'], ['fall', 'airGuard'],
+  ['jump', 'apex', 'fall'], ['jump', 'jumpAtk0', 'jumpAtk'],
+  ['hit', 'hit0', 'idle0'], ['win', 'win0', 'win'],
+  ['idle0', 'longWind', 'longAtk0', 'longAtk', 'attack1'],
+  ['idle0', 'heavyWind', 'heavyAtk0', 'heavyAtk', 'attack1'],
+  ['jump', 'flip', 'dive', 'hit0'], ['jump', 'airDash'],
+  ['idle0', 'chargeHold', 'chargeAtk', 'attack1'],
+  ['idle0', 'bowDraw', 'bowShot', 'idle0'],
+  ['chargeHold', 'backTurn', 'backKick'], ['backKick', 'backTurn', 'idle0']
+];
+const FRAME_DEFS = [...BASE_FRAMES];
+for (const chain of MOTION_CHAINS) for (let i = 0; i < chain.length - 1; i++) {
+  const name = `${chain[i]}>${chain[i + 1]}`;
+  if (!FRAME_DEFS.some(d => d[0] === name)) FRAME_DEFS.push([name, chain[i], chain[i + 1], 0.5]);
+}
 const FRAME_BY_NAME = Object.fromEntries(FRAME_DEFS.map(d => [d[0], d]));
 export const FRAMES = FRAME_DEFS.map(d => d[0]);
 
@@ -175,13 +198,25 @@ const HORSE_POSES = {
   hit:    { legs: [[-10, -20], [-20, -25], [10, 20], [0, 10]], rear: -8 },
   rear:   { legs: [[70, -40], [55, -70], [8, 4], [-4, -2]], rear: -24 }
 };
-const HORSE_FOR = { idle0: 'stand', idle1: 'stand', guard: 'stand', airGuard: 'tuck', jump: 'tuck', fall: 'tuck', jumpAtk: 'tuck', win: 'rear' };
+const HORSE_FOR = {
+  idle0: 'stand', idle1: 'stand', guard: 'stand', airGuard: 'tuck', jump: 'tuck', fall: 'tuck', jumpAtk: 'tuck', win: 'rear',
+  longWind: 'windup', longAtk: 'attack', heavyWind: 'rear', heavyAtk: 'attack', flip: 'tuck', dive: 'tuck', chargeHold: 'windup',
+  airDash: 'tuck', chargeAtk: 'attack', bowDraw: 'stand', bowShot: 'stand', backTurn: 'windup', backKick: 'attack'
+};
+const horseKey = name => HORSE_POSES[HORSE_FOR[name] || name] || HORSE_POSES.stand;
+// in-between frames blend the horse legs of their two source frames
+function horsePose(name) {
+  const d = FRAME_BY_NAME[name];
+  if (!d || d.length === 1) return horseKey(name);
+  const a = horsePose(d[1]), b = horsePose(d[2]), t = d[3];
+  return { legs: a.legs.map((l, i) => l.map((v, j) => v + (b.legs[i][j] - v) * t)), rear: a.rear + (b.rear - a.rear) * t };
+}
 
 const HS = 1.3; // horse drawing scale
 export const SADDLE = [-5, -99];
 
 function renderHorse(name, rider) {
-  const hp = HORSE_POSES[HORSE_FOR[name] || name] || HORSE_POSES.stand;
+  const hp = horsePose(name);
   const coat = '#5a3826', dark = shade(coat, 0.72), mane = '#1c1210';
   const hips = [[28, -44], [24, -44], [-30, -44], [-34, -44]];
   const legs = hp.legs.map(([u, l], i) => { const k = P(hips[i], 21, u); return [hips[i], k, P(k, 21, l)]; });
@@ -412,11 +447,14 @@ export const CHARS = [
       attack: { lean: -14, tilt: -4, fTh: 95, fSh: 95, bTh: -16, bSh: -10, fUp: 45, fFo: 150, bUp: -20, bFo: 40 },
       longWind: { lean: -10, fTh: 85, fSh: 5, fUp: 40, fFo: 150, bUp: 25, bFo: 140 },
       longAtk: { lean: -24, tilt: -10, fTh: 92, fSh: 88, bTh: -12, bSh: -22, fUp: 60, fFo: 140, bUp: -40, bFo: 10 },
-      heavyWind: { lean: -18, tilt: -6, fTh: 165, fSh: 176, bTh: -8, bSh: -8, fUp: 30, fFo: 140, bUp: 20, bFo: 120 },
+      // axe kick: the straight leg is raised to head height and held there
+      heavyWind: { lean: -16, tilt: -6, fTh: 150, fSh: 160, bTh: -8, bSh: -8, fUp: 30, fFo: 140, bUp: 20, bFo: 120 },
       heavyAtk: { lean: 14, tilt: 6, fTh: 72, fSh: 38, bTh: -18, bSh: -14, fUp: 40, fFo: 150, bUp: 30, bFo: 140 },
       chargeHold: { lean: 22, tilt: 8, fTh: 40, fSh: -8, bTh: -46, bSh: -26, fUp: 30, fFo: 150, bUp: 20, bFo: 140 },
-      // back kick: the torso turns away, the rear leg drives straight at the opponent
-      chargeAtk: { lean: -40, tilt: -12, fTh: -6, fSh: -4, bTh: 96, bSh: 96, fUp: -30, fFo: 20, bUp: 40, bFo: 150 },
+      // back kick, drawn mirrored by the stage: the back faces the opponent, the torso bends away
+      // and the rear leg drives straight back at the opponent (local -x)
+      backTurn: { lean: 12, tilt: 4, fTh: 26, fSh: -18, bTh: 70, bSh: -50, fUp: 40, fFo: 150, bUp: 30, bFo: 140 },
+      backKick: { lean: 34, tilt: 14, fTh: 6, fSh: -6, bTh: -96, bSh: -96, fUp: 70, fFo: 110, bUp: -10, bFo: 60 },
       guard: { fUp: 20, fFo: 168, bUp: 25, bFo: 162 }, airGuard: { fUp: 20, fFo: 168, bUp: 25, bFo: 162 },
       jumpAtk: { lean: -10, fTh: 96, fSh: 96, bTh: 20, bSh: -60, fUp: 45, fFo: 150, bUp: 30, bFo: 140 },
       // flying side kick (twio yeop chagi): lead leg locked 45° down-forward

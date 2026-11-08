@@ -24,6 +24,7 @@ export function attackTiming(f) {
   if (k === 'long') return { startup: s.startup * LONG_ATTACK_SLOW, active: s.active * LONG_ATTACK_SLOW, recovery: s.recovery * LONG_ATTACK_SLOW };
   if (k === 'dive') return { startup: 0.05, active: Infinity, recovery: DIVE_LAND_RECOVERY };
   if (k === 'charged') return { startup: CHARGE_TIME, active: s.active, recovery: s.recovery };
+  if (k === 'heavy' && s.heavyHold) return { startup: s.startup + s.heavyHold, active: s.active, recovery: s.recovery };
   return s;
 }
 
@@ -179,43 +180,83 @@ export function stepFighter(f, input, dt, world) {
   if (f.onGround && Math.abs(f.vx) > 10) f.walk += Math.abs(f.vx) * dt;
 }
 
-const IDLE = ['idle0', 'idle01', 'idle1', 'idle10'];
-const WALK = ['walk0', 'walk01', 'walk1', 'walk12', 'walk2', 'walk23', 'walk3', 'walk30'];
+// Motion chains as drawn by tools/art/rig.js (a>b is the midpoint frame between a and b).
+const mid = list => list.flatMap((n, i) => (i < list.length - 1 ? [n, `${n}>${list[i + 1]}`] : [n]));
+const IDLE = mid(['idle0', 'idle01', 'idle1', 'idle10', 'idle0']).slice(0, -1);
+const WALK = mid(['walk0', 'walk01', 'walk1', 'walk12', 'walk2', 'walk23', 'walk3', 'walk30', 'walk0']).slice(0, -1);
+const WINDUP = ['idle0>windup0', 'windup0', 'windup0>windup', 'windup'];
+const RECOVER = (from, via = 'attack1') => [from, `${from}>${via}`, via, `${via}>idle0`];
+// u in [0, 1) picks a frame from the list
+const pick = (list, u) => list[Math.min(list.length - 1, Math.max(0, Math.floor((u || 0) * list.length)))];
+
+// Body turn for the taekwondo back kick: 1 = facing the opponent, -1 = back to the opponent.
+// The sprite's x scale is multiplied by this, so the turn reads as the body spinning around.
+export function turnScale(f) {
+  if (f.attack?.kind !== 'charged' || !f.stats.backKick || f.super || f.stun > 0) return 1;
+  const T = attackTiming(f), t = f.attack.t;
+  if (t < T.startup) { const v = (t / T.startup - 0.55) / 0.45; return v <= 0 ? 1 : Math.cos(Math.PI * Math.min(1, v)); }
+  if (t < T.startup + T.active) return -1;
+  const v = ((t - T.startup - T.active) / T.recovery - 0.35) / 0.65;
+  return v <= 0 ? -1 : -Math.cos(Math.PI * Math.min(1, v));
+}
 
 // Sprite frame for the current state.
 export function frameName(f) {
-  if (f.won) return Math.floor(f.t / 0.4) % 2 ? 'win0' : 'win';
+  if (f.won) return pick(['win', 'win>win0', 'win0', 'win0>win'], (f.t / 0.8) % 1);
   if (f.ko) return 'hit';
-  if (f.stun > 0) return f.stun > HIT_STUN * 0.4 ? 'hit' : 'hit0';
+  if (f.stun > 0) return pick(RECOVER('hit', 'hit0'), 1 - Math.min(1, f.stun / HIT_STUN));
   if (f.super) {
-    const hits = f.super.def.hits, t = f.super.t;
-    if (!hits.length) return t < f.super.def.time * 0.4 ? 'windup' : 'win'; // summons: a call, then a pointing pose
+    const def = f.super.def, hits = def.hits, t = f.super.t;
+    if (!hits.length) return t < def.time * 0.4 ? pick(WINDUP, t / (def.time * 0.4)) : 'win'; // summons: a call, then a pointing pose
     if (f.super.flying) return 'flip';
-    if (hits.some(h => t >= h.at && t < h.at + h.len)) return f.super.def.hitFrame ?? (f.onGround ? 'attack' : 'jumpAtk');
-    if (t < hits[0].at) return 'windup';
-    return hits.some(h => h.at > t) ? 'windup' : 'attack';
+    if (hits.some(h => t >= h.at && t < h.at + h.len)) return def.hitFrame ?? (f.onGround ? 'attack' : 'jumpAtk');
+    if (t < hits[0].at) return pick(WINDUP, t / hits[0].at);
+    const last = hits[hits.length - 1], end = last.at + last.len;
+    return t < end ? 'windup' : pick(RECOVER('attack'), (t - end) / Math.max(0.01, def.time - end));
   }
   if (f.charge > 0) return 'guard';
   const ph = attackPhase(f);
   if (ph) {
-    const k = f.attack.kind, { startup, active, recovery } = attackTiming(f), t = f.attack.t;
-    const early = ph === 'startup' && t < startup * 0.45, rec = (t - startup - active) / recovery;
-    if (k === 'dive') return ph === 'recovery' ? 'hit0' : 'dive';
-    if (k === 'charged' && f.stats.bow) return ph === 'startup' ? 'bowDraw' : rec < 0.6 ? 'bowShot' : 'attack1';
-    if (k === 'charged') return ph === 'startup' ? (Math.floor(t / 0.08) % 2 ? 'heavyWind' : 'chargeHold') : ph === 'active' || rec < 0.4 ? 'chargeAtk' : 'attack1';
-    if (k === 'aerial') return ph === 'startup' ? (early ? 'jump' : 'jumpAtk0') : 'jumpAtk';
-    if (k === 'long') return ph === 'startup' ? (early ? 'longWind' : 'longAtk0') : ph === 'active' || rec < 0.4 ? 'longAtk' : 'attack1';
-    if (k === 'heavy') return ph === 'startup' ? (t < startup * 0.6 ? 'heavyWind' : 'heavyAtk0') : ph === 'active' || rec < 0.5 ? 'heavyAtk' : 'attack1';
-    if (ph === 'startup') return early ? 'windup0' : 'windup';
-    if (ph === 'active' || rec < 0.35) return 'attack';
-    return rec < 0.7 ? 'attack1' : 'idle0';
+    const k = f.attack.kind, T = attackTiming(f), t = f.attack.t;
+    const us = t / T.startup, ua = (t - T.startup) / T.active, ur = (t - T.startup - T.active) / T.recovery;
+    if (k === 'dive') return ph === 'recovery' ? pick(['hit0', 'hit0>idle0'], (t - f.attack.landed) / DIVE_LAND_RECOVERY) : pick(['flip>dive', 'dive'], t / 0.1);
+    if (k === 'aerial') return ph === 'startup' ? pick(['jump', 'jump>jumpAtk0', 'jumpAtk0', 'jumpAtk0>jumpAtk'], us) : 'jumpAtk';
+    if (k === 'long') {
+      if (ph === 'startup') return pick(['idle0>longWind', 'longWind', 'longWind>longAtk0', 'longAtk0', 'longAtk0>longAtk'], us);
+      return ph === 'active' ? 'longAtk' : pick(RECOVER('longAtk'), ur);
+    }
+    if (k === 'heavy') {
+      // rise, hold at the top (taekwondo axe kick), then chop
+      const base = f.stats.startup, hold = f.stats.heavyHold || 0, rise = base * 0.6;
+      if (ph === 'startup') {
+        if (t < rise) return pick(['idle0>heavyWind', 'heavyWind'], t / rise);
+        if (t < rise + hold) return 'heavyWind';
+        return pick(['heavyWind>heavyAtk0', 'heavyAtk0'], (t - rise - hold) / (base - rise));
+      }
+      return ph === 'active' ? pick(['heavyAtk0>heavyAtk', 'heavyAtk'], ua * 2) : pick(RECOVER('heavyAtk'), ur);
+    }
+    if (k === 'charged' && f.stats.bow) {
+      if (ph === 'startup') return pick(['idle0>bowDraw', 'bowDraw'], us * 2.5);
+      return pick(['bowDraw>bowShot', 'bowShot', 'bowShot>idle0'], (t - T.startup) / (T.active + T.recovery));
+    }
+    if (k === 'charged' && f.stats.backKick) {
+      if (ph === 'startup') return us < 0.55 ? pick(['idle0>chargeHold', 'chargeHold'], us / 0.55 * 2) : pick(['chargeHold>backTurn', 'backTurn'], (us - 0.55) / 0.45);
+      if (ph === 'active') return pick(['backTurn>backKick', 'backKick'], ua * 2);
+      return ur < 0.35 ? 'backKick' : pick(['backKick>backTurn', 'backTurn', 'backTurn>idle0'], (ur - 0.35) / 0.65);
+    }
+    if (k === 'charged') {
+      if (ph === 'startup') return us < 0.2 ? pick(['idle0>chargeHold', 'chargeHold'], us / 0.2) : Math.floor(t / 0.06) % 2 ? 'chargeHold' : 'chargeHold>chargeAtk';
+      return ph === 'active' ? pick(['chargeHold>chargeAtk', 'chargeAtk'], ua * 2) : pick(RECOVER('chargeAtk'), ur);
+    }
+    if (ph === 'startup') return pick(WINDUP, us);
+    return ph === 'active' ? pick(['windup>attack', 'attack'], ua * 2) : pick(RECOVER('attack'), ur);
   }
-  if (f.guarding) return f.onGround ? (f.guard ? 'guard' : 'guard0') : 'airGuard';
+  if (f.guarding) return f.onGround ? (f.guard ? 'guard' : pick(['idle0>guard0', 'guard0', 'guard0>guard'], f.guardT / f.stats.guardUp)) : 'airGuard';
   if (!f.onGround) {
-    if (dashing(f)) return 'airDash';
-    if (f.doubled && f.canDouble && f.flipT < FLIP_TIME) return 'flip';
-    return f.vy < -250 ? 'jump' : f.vy <= 250 ? 'apex' : 'fall';
+    if (dashing(f)) return pick(['jump>airDash', 'airDash'], f.airDash.t / 0.06);
+    if (f.doubled && f.canDouble && f.flipT < FLIP_TIME) return f.flipT < 0.05 ? 'jump>flip' : 'flip';
+    return pick(['jump', 'jump>apex', 'apex', 'apex>fall', 'fall'], (f.vy + 400) / 800);
   }
-  if (Math.abs(f.vx) > 10) return WALK[Math.floor(f.walk / 11) % 8];
-  return IDLE[Math.floor(f.t / 0.225) % 4];
+  if (Math.abs(f.vx) > 10) return WALK[Math.floor(f.walk / 5.5) % WALK.length];
+  return IDLE[Math.floor(f.t / 0.1125) % IDLE.length];
 }

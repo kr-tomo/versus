@@ -50,8 +50,8 @@ test('taekwondo super: flies to an opponent within 3x reach in front or above, a
   assert.equal(b.energy, MAX_ENERGY);
 });
 
-test('archer arrow: arc reaches 2/3 of the view, peaks at 1.6x body height, hits for 1.5x', () => {
-  const c = BODY_H * 0.68, H = BODY_H * 1.6, { a, b } = arrowArc(c, H);
+test('archer arrow: arc reaches 2/3 of the view, peaks at 1.2x body height, hits for 1.5x', () => {
+  const c = BODY_H * 0.68, H = BODY_H * 1.2, { a, b } = arrowArc(c, H);
   const h = u => a * u * u + b * u + c;
   assert.ok(Math.abs(h(1)) < 1e-9);
   const peak = Math.max(...Array.from({ length: 1001 }, (_, i) => h(i / 1000)));
@@ -66,11 +66,18 @@ test('archer arrow: arc reaches 2/3 of the view, peaks at 1.6x body height, hits
   assert.equal(q.energy, MAX_ENERGY - Math.round(WEAPONS.archer.power * 1.5));
 });
 
-test('archer super: the shell bursts at the map center and hurts the opponent near it', () => {
-  for (const [ox, hit] of [[WORLD_W / 2 + 60, true], [WORLD_W / 2 + 320, false]]) {
+test('archer super: the shell bursts at the center of the current view, radius 225', () => {
+  assert.equal(SUPERS.archer.bomb.radius, 150 * 1.5);
+  // camera pushed to the left edge: the view center (320) is far from the map center (640)
+  for (const [ox, hit] of [[320 + 200, true], [320 + 300, false]]) {
     const g = fight('archer', 'sword'), [a, b] = g.fighters;
-    a.x = ox > WORLD_W / 2 + 200 ? WORLD_W / 2 + 100 : 380; b.x = ox; a.meter = SUPER_MAX;
-    run(g, SUPER_HOLD + DT * 2, () => both);
+    g.cam = 0; a.x = 60; b.x = ox; a.meter = SUPER_MAX;
+    run(g, SUPER_HOLD + DT * 2, () => both, () => { b.x = ox; return NO_INPUT; });
+    let bomb;
+    for (let t = 0; t < 1 && !bomb; t += DT) { g.update(DT, [NO_INPUT, NO_INPUT]); bomb = g.projectiles.find(p => p.type === 'bomb'); }
+    assert.ok(bomb, 'shell launched');
+    assert.ok(Math.abs(bomb.cx - (g.cam + VIEW_W / 2)) < 1, 'aimed at the view center');
+    assert.ok(Math.abs(bomb.cx - WORLD_W / 2) > 200, 'not the map center');
     let boom = false;
     for (let t = 0; t < 1.8; t += DT) { g.update(DT, [NO_INPUT, NO_INPUT]); boom ||= g.effects.some(e => e.type === 'explosion'); }
     assert.ok(boom, 'explodes');
@@ -110,4 +117,23 @@ test('stage: every map has its effect palette (missing ones crashed the fight sc
   const src = (await import('node:fs')).readFileSync(new URL('../js/stage.js', import.meta.url), 'utf8');
   const block = src.slice(src.indexOf('const MAP_FX = {'), src.indexOf('};', src.indexOf('const MAP_FX = {')));
   for (const id of MAP_IDS) assert.match(block, new RegExp(`\\b${id}:`), id);
+});
+
+test('taekwondo: the axe kick holds 0.2s at the top; the back kick turns the body around', async () => {
+  const { attackTiming, turnScale, frameName } = await import('../js/fighter.js');
+  const W = { platforms: [], ice: false };
+  const f = createFighter('tkd', 400, 1);
+  stepFighter(f, { ...NO_INPUT, left: true, attack: true }, DT, W);
+  assert.equal(f.attack.kind, 'heavy');
+  assert.ok(Math.abs(attackTiming(f).startup - (WEAPONS.tkd.startup + 0.2)) < 1e-9);
+  const top = [];
+  for (let i = 0; i < 60; i++) { stepFighter(f, { ...NO_INPUT, left: true }, DT, W); top.push(frameName(f)); }
+  assert.ok(top.filter(n => n === 'heavyWind').length * DT >= 0.2, 'leg held up for at least 0.2s');
+  // back kick: faces the opponent, turns its back while charging, kicks with its back turned, turns back
+  const k = createFighter('tkd', 400, 1), scales = [];
+  for (let i = 0; i < 200; i++) { stepFighter(k, { ...NO_INPUT, attack: i < 120 }, DT, W); if (k.attack?.kind === 'charged') scales.push([turnScale(k), frameName(k)]); }
+  assert.ok(scales.some(([s]) => s === 1) && scales.some(([s]) => s === -1), 'turns from front to back');
+  assert.ok(scales.some(([s]) => Math.abs(s) < 0.3), 'passes through side-on mid-turn');
+  assert.ok(scales.filter(([, n]) => n === 'backKick').every(([s]) => s === -1), 'kicks with the back turned');
+  assert.equal(turnScale(createFighter('sword', 0, 1)), 1);
 });

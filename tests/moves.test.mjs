@@ -102,7 +102,7 @@ test('double jump: only fighters with reach at most half the longest', () => {
 test('dive: attack during a double jump drives 45° into the ground with aerial damage', () => {
   const f = createFighter('fist', 400, 1);
   step(f, { ...NO_INPUT, jump: true }); step(f, NO_INPUT, 10); step(f, { ...NO_INPUT, jump: true }); step(f, NO_INPUT, 4);
-  assert.equal(frameName(f), 'flip');
+  assert.match(frameName(f), /flip$/, 'somersault (or its lead-in frame)');
   step(f, { ...NO_INPUT, attack: true });
   assert.equal(f.attack.kind, 'dive');
   step(f, NO_INPUT, 8);
@@ -120,7 +120,7 @@ test('frames: twice the old count, every frame the game asks for exists in each 
     'hit', 'hit0', 'win', 'win0', 'longWind', 'longAtk0', 'longAtk', 'heavyWind', 'heavyAtk0', 'heavyAtk', 'flip', 'dive'];
   for (const w of WEAPON_IDS) {
     const frames = theme.characters[w].frames;
-    assert.ok(Object.keys(frames).length >= 30, w);
+    assert.ok(Object.keys(frames).length >= 82, `${w}: at least twice the 41 frames of v8`);
     for (const n of names) assert.ok(n in frames, `${w} ${n}`);
   }
 });

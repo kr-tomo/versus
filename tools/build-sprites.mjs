@@ -1,6 +1,6 @@
 // Generates the "classic" theme sprite sheets from the vector rig.
 // Usage: node tools/build-sprites.mjs
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readdirSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHARS, FRAMES, renderChar, renderBull, BULL_FRAMES, f } from './art/rig.js';
@@ -12,17 +12,23 @@ const out = join(root, 'themes/classic');
 const write = (rel, text) => { const p = join(out, rel); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, text); };
 const svg = (w, h, body, vb = `0 0 ${w} ${h}`) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${vb}">${body}</svg>\n`;
 
-const CELL = [220, 190], ORIGIN = [70, 180], COLS = 6;
+const CELL = [220, 190], ORIGIN = [70, 180], COLS = 6, ROWS = 6, PER_PAGE = COLS * ROWS;
 const theme = { id: 'classic', name: '클래식', characters: {}, maps: {} };
 
+// frames are split into pages of PER_PAGE so each sheet stays small enough to rasterize sharply
+const PAGES = Math.ceil(FRAMES.length / PER_PAGE);
+for (const f of readdirSync(join(out, 'characters'))) unlinkSync(join(out, 'characters', f));
 for (const c of CHARS) {
-  const rows = Math.ceil(FRAMES.length / COLS), cell = c.cell || CELL, origin = c.cellOrigin || ORIGIN;
-  let body = '';
-  FRAMES.forEach((name, i) => {
-    const x = (i % COLS) * cell[0] + origin[0], y = Math.floor(i / COLS) * cell[1] + origin[1];
-    body += `<g transform="translate(${x} ${y})">${renderChar(c, name).svg}</g>`;
-  });
-  write(`characters/${c.id}.svg`, svg(cell[0] * COLS, cell[1] * rows, body));
+  const cell = c.cell || CELL, origin = c.cellOrigin || ORIGIN, sheets = [];
+  for (let pg = 0; pg < PAGES; pg++) {
+    let body = '';
+    FRAMES.slice(pg * PER_PAGE, (pg + 1) * PER_PAGE).forEach((name, i) => {
+      const x = (i % COLS) * cell[0] + origin[0], y = Math.floor(i / COLS) * cell[1] + origin[1];
+      body += `<g transform="translate(${x} ${y})">${renderChar(c, name).svg}</g>`;
+    });
+    sheets.push(`characters/${c.id}-${pg}.svg`);
+    write(sheets[pg], svg(cell[0] * COLS, cell[1] * ROWS, body));
+  }
 
   const p = renderChar(c, 'idle0', { noFront: true });
   const [hx, hy] = p.head;
@@ -31,7 +37,7 @@ for (const c of CHARS) {
 
   theme.characters[c.id] = {
     name: c.name, en: c.en, title: c.origin, color: c.accent,
-    sheet: `characters/${c.id}.svg`, portrait: `portraits/${c.id}.svg`,
+    sheets, perPage: PER_PAGE, portrait: `portraits/${c.id}.svg`,
     cell, origin, cols: COLS, scale: 0.8,
     frames: Object.fromEntries(FRAMES.map((n, i) => [n, i]))
   };
@@ -70,4 +76,4 @@ write('extras/bull.svg', svg(BULL_CELL[0] * BULL_FRAMES, BULL_CELL[1], bull));
 theme.extras = { bull: { sheet: 'extras/bull.svg', cell: BULL_CELL, origin: BULL_ORIGIN, frames: BULL_FRAMES, scale: 0.85 } };
 
 write('theme.json', JSON.stringify(theme, null, 2) + '\n');
-console.log(`theme written to ${out}`);
+console.log(`theme written to ${out} (${FRAMES.length} frames per character, ${PAGES} sheet pages)`);
