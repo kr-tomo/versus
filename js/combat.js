@@ -1,7 +1,8 @@
 import {
   BODY_HALF_W, BODY_H, KNOCKBACK_PER_DMG, GUARD_KNOCKBACK_RATIO, GUARD_DAMAGE, HIT_STUN,
   JUMP_ATTACK_MULT, AIR_EVADE, SUPER_MAX, SUPER_GAIN_HIT, SUPER_GAIN_GUARD,
-  LONG_REACH_BONUS, HEAVY_REACH, DIVE_REACH, CHARGE_MULT, CHARGE_GUARD_RATIO, CHARGE_BREAK_STUN, SUPER_GAIN_CHARGE_GUARD
+  LONG_REACH_BONUS, HEAVY_REACH, DIVE_REACH, CHARGE_MULT, CHARGE_GUARD_RATIO, CHARGE_BREAK_STUN, SUPER_GAIN_CHARGE_GUARD,
+  PLUNGE_MULT
 } from './config.js';
 import { attackPhase, superHit, dashing } from './fighter.js';
 
@@ -15,8 +16,12 @@ export function strike(f) {
   if (attackPhase(f) !== 'active' || f.attack.hit) return null;
   const { aerial, kind } = f.attack;
   if (kind === 'charged' && f.stats.bow) return null; // the archer shoots instead (game.js spawns the arrow)
-  const dmg = Math.round(f.stats.power * (aerial ? JUMP_ATTACK_MULT : kind === 'charged' ? CHARGE_MULT : 1));
-  const reach = kind === 'long' ? f.stats.reach + LONG_REACH_BONUS : kind === 'heavy' ? f.stats.reach * HEAVY_REACH : kind === 'dive' ? DIVE_REACH : f.stats.reach;
+  const st = f.stats, mult = kind === 'plunge' ? PLUNGE_MULT : aerial ? JUMP_ATTACK_MULT : kind === 'charged' ? CHARGE_MULT : 1;
+  const dmg = Math.round(st.power * mult);
+  const reach = kind === 'long' ? (st.reach + LONG_REACH_BONUS) * (st.longReach ?? 1)
+    : kind === 'heavy' ? st.reach * (st.heavyReach ?? HEAVY_REACH)
+    : kind === 'dive' || kind === 'plunge' ? DIVE_REACH
+    : aerial ? st.reach * (st.airReach ?? 1) : st.reach;
   return { reach, dmg, kb: dmg * KNOCKBACK_PER_DMG, stun: HIT_STUN, aerial, kind, super: false };
 }
 
@@ -24,7 +29,9 @@ export function hitbox(f, s = strike(f)) {
   if (!s) return null;
   const h = height(f), front = f.x + f.facing * halfW(f), tip = front + f.facing * s.reach;
   // a dive leads with the feet / blade: the box sits low and reaches below the body
-  const [y1, y2] = s.tall ? [f.y - 400, f.y + 60] : s.kind === 'dive' ? [f.y - h * 0.55, f.y + 22] : s.aerial ? [f.y - h * 0.85, f.y + 12] : [f.y - h * 0.95, f.y - h * 0.25];
+  // a plunge strikes straight down: the box sits under the body instead of in front
+  if (s.kind === 'plunge') return { x1: f.x - halfW(f) - 10, x2: f.x + halfW(f) + 10, y1: f.y - h * 0.4, y2: f.y + 34 };
+  const [y1, y2] = s.tall ? [f.y - 400, f.y + 60] : s.high ? [f.y - h * 1.6, f.y - h * 0.15] : s.kind === 'dive' ? [f.y - h * 0.55, f.y + 22] : s.aerial ? [f.y - h * 0.85, f.y + 12] : [f.y - h * 0.95, f.y - h * 0.25];
   return { x1: Math.min(front, tip), x2: Math.max(front, tip), y1, y2 };
 }
 
@@ -39,8 +46,8 @@ const gain = (f, n) => { f.meter = Math.min(SUPER_MAX, f.meter + n); };
 // Supers: guard takes 1/4 chip unless the hit ignores (ub) or crushes the guard.
 // Airborne defenders dodge with AIR_EVADE chance. Being hit charges the super gauge.
 // lateGuard: the defender is holding guard when the hit is confirmed (counts even if not fully up).
-// Heavy-attack armor: a defender in a heavy attack takes the damage but no knockback or stun and
-// keeps swinging (supers still break through).
+// Heavy-attack armor: a defender in a heavy attack (or the mace's forward attack) takes the damage
+// but no knockback or stun and keeps swinging (supers still break through).
 export function applyHit(att, def, s = strike(att) ?? { dmg: att.stats.power, kb: att.stats.power * KNOCKBACK_PER_DMG, stun: HIT_STUN }, rand = Math.random, { lateGuard = false } = {}) {
   if (!def.onGround && !s.sure && !s.noEvade && rand() < AIR_EVADE) return { evaded: true, guarded: false, damage: 0 };
   const guarded = (def.guard || lateGuard) && !s.ub;
@@ -66,7 +73,8 @@ export function applyHit(att, def, s = strike(att) ?? { dmg: att.stats.power, kb
     kb *= GUARD_KNOCKBACK_RATIO;
   }
   def.energy = Math.max(0, def.energy - damage);
-  if (def.attack?.kind === 'heavy' && !s.super && !guarded) {
+  const armored = def.attack?.kind === 'heavy' || (def.attack?.kind === 'long' && def.stats.longArmor);
+  if (armored && !s.super && !guarded) {
     def.hitFlash = 0.2;
     gain(def, SUPER_GAIN_HIT);
     return { evaded: false, guarded, damage, armored: true };

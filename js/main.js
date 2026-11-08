@@ -6,6 +6,7 @@ import { Game } from './game.js';
 import { AI } from './ai.js';
 import { Stage } from './stage.js';
 import { MenuNav, pickNext } from './menu.js';
+import { moveList } from './moves.js';
 
 const $ = s => document.querySelector(s);
 const stageEl = $('#stage'), controls = $('#controls'), pauseBtn = $('#pauseBtn'), exitBtn = $('#exitBtn'), hints = $('#hints');
@@ -21,7 +22,7 @@ const SCREENS = {
 };
 const HINTS = {
   title: 'Ⓐ 선택',
-  setup: '방향키 커서 · Ⓐ 선택 · Ⓑ 뒤로 · LB/RB 맵 · ☰ 시작',
+  setup: '방향키 커서 · Ⓐ 선택 · Ⓑ 기술표 · Select 뒤로 · LB/RB 맵 · ☰ 시작',
   pause: 'Ⓐ 선택 · Ⓑ/☰ 계속하기',
   confirm: 'Ⓐ 선택 · Ⓑ 계속하기',
   result: 'Ⓐ 선택 · Ⓑ 메뉴로'
@@ -38,6 +39,7 @@ const focused = new Map(); // activeScreen id → last focused element
 
 /* ---------- screens ---------- */
 function show(id) {
+  closeMoveLists();
   activeScreen = id;
   for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== id;
   const playing = id === null || id === 'pause' || id === 'result' || id === 'confirm';
@@ -87,7 +89,45 @@ function updateHints() {
 }
 
 /* ---------- gamepad / keyboard menu actions ---------- */
+/* ---------- move list popup (pad Ⓑ on the setup screen) ---------- */
+const moveLists = new Map(); // pad index → popup element
+
+// The character under this pad's cursor (or the one picked on its side) and the side it belongs to.
+function moveListTarget(src) {
+  const cur = document.querySelector(src === 1 && settings.mode === '2p' ? '.nav-focus2' : '.nav-focus');
+  const side = cur?.closest('.side') ?? document.querySelector(`#setup .side[data-player="${src === 1 && settings.mode === '2p' ? 1 : 0}"]`);
+  return { side, w: cur?.dataset.w ?? settings.weapons[+side.dataset.player] };
+}
+
+function toggleMoveList(src) {
+  if (moveLists.has(src)) { moveLists.get(src).remove(); moveLists.delete(src); stage.play('back'); return; }
+  const { side, w } = moveListTarget(src), c = theme.characters[w], ml = moveList(w);
+  for (const [k, el] of moveLists) if (el.parentElement === side) { el.remove(); moveLists.delete(k); }
+  const el = document.createElement('div');
+  el.className = 'movelist';
+  el.innerHTML = `<header><img src="${theme.base + c.portrait}" alt=""><div><b>${c.name}</b><small>${c.title} · ${ml.name}</small></div></header>
+    <div class="ml-body"><table>${ml.rows.map(r => `<tr><th>${r.kind}</th><td><b>${r.name}</b>${r.note ? `<small>${r.note}</small>` : ''}</td><td class="in">${r.input}</td></tr>`).join('')}</table></div>
+    <footer>▲▼ 스크롤 · Ⓑ 닫기</footer>`;
+  side.appendChild(el);
+  moveLists.set(src, el);
+  stage.play('select');
+}
+
+function closeMoveLists() { for (const el of moveLists.values()) el.remove(); moveLists.clear(); }
+
 function onNav(action, src, repeat) {
+  // an open move list takes this pad's input: up/down scroll, Ⓑ closes
+  if (moveLists.has(src)) {
+    const body = moveLists.get(src).querySelector('.ml-body');
+    if (action === 'up' || action === 'down') body.scrollTop += (action === 'up' ? -1 : 1) * body.clientHeight * 0.4;
+    else if (action === 'back' && !repeat) toggleMoveList(src);
+    else if (action === 'start' && !repeat) { closeMoveLists(); startFromSetup(); }
+    return true;
+  }
+  if (activeScreen === 'setup' && src !== 'kb' && !repeat) {
+    if (action === 'back') { toggleMoveList(src); return true; }
+    if (action === 'select') { stage.play('back'); show('title'); return true; }
+  }
   if (activeScreen === null) {
     // fighting: only pause / exit
     if (repeat) return false;

@@ -135,6 +135,8 @@ const DERIVED = {
   chargeAtk: { from: ['heavyAtk', 'heavyAtk', 0] },
   backTurn:  { from: ['chargeHold', 'chargeHold', 0] },
   backKick:  { from: ['chargeAtk', 'chargeAtk', 0] },
+  // straight-down air strike: knees tucked, both hands driving the weapon point at the ground
+  plunge:    { from: ['jumpAtk', 'jumpAtk', 0], set: { lean: 4, tilt: 6, fTh: 75, fSh: -15, bTh: 40, bSh: -60, fUp: 25, fFo: 5, bUp: 30, bFo: 10, w: 90, wB: 90 } },
   // bow frames (only the archer swaps in the bow; the rest render them like an extended guard)
   bowDraw:   { from: ['idle0', 'idle0', 0], add: { lean: -3 }, set: { fUp: 90, fFo: 92, bUp: 72, bFo: -48, w: 0, wB: 0, fTh: 34, fSh: 0, bTh: -24, bSh: -14 } },
   bowShot:   { from: ['idle0', 'idle0', 0], add: { lean: -1 }, set: { fUp: 90, fFo: 92, bUp: 35, bFo: -95, w: 0, wB: 0, fTh: 34, fSh: 0, bTh: -24, bSh: -14 } }
@@ -153,7 +155,7 @@ const BASE_FRAMES = [
   ['longWind'], ['longAtk0', 'longWind', 'longAtk', 0.5], ['longAtk'],
   ['heavyWind'], ['heavyAtk0', 'heavyWind', 'heavyAtk', 0.5], ['heavyAtk'],
   ['flip'], ['dive'], ['chargeHold'], ['airDash'], ['chargeAtk'], ['bowDraw'], ['bowShot'],
-  ['backTurn'], ['backKick']
+  ['backTurn'], ['backKick'], ['plunge']
 ];
 export const MOTION_CHAINS = [
   ['idle0', 'idle01', 'idle1', 'idle10', 'idle0'],
@@ -167,7 +169,8 @@ export const MOTION_CHAINS = [
   ['jump', 'flip', 'dive', 'hit0'], ['jump', 'airDash'],
   ['idle0', 'chargeHold', 'chargeAtk', 'attack1'],
   ['idle0', 'bowDraw', 'bowShot', 'idle0'],
-  ['chargeHold', 'backTurn', 'backKick'], ['backKick', 'backTurn', 'idle0']
+  ['chargeHold', 'backTurn', 'backKick'], ['backKick', 'backTurn', 'idle0'],
+  ['jump', 'plunge', 'hit0']
 ];
 const FRAME_DEFS = [...BASE_FRAMES];
 for (const chain of MOTION_CHAINS) for (let i = 0; i < chain.length - 1; i++) {
@@ -201,7 +204,7 @@ const HORSE_POSES = {
 const HORSE_FOR = {
   idle0: 'stand', idle1: 'stand', guard: 'stand', airGuard: 'tuck', jump: 'tuck', fall: 'tuck', jumpAtk: 'tuck', win: 'rear',
   longWind: 'windup', longAtk: 'attack', heavyWind: 'rear', heavyAtk: 'attack', flip: 'tuck', dive: 'tuck', chargeHold: 'windup',
-  airDash: 'tuck', chargeAtk: 'attack', bowDraw: 'stand', bowShot: 'stand', backTurn: 'windup', backKick: 'attack'
+  airDash: 'tuck', chargeAtk: 'attack', bowDraw: 'stand', bowShot: 'stand', backTurn: 'windup', backKick: 'attack', plunge: 'tuck'
 };
 const horseKey = name => HORSE_POSES[HORSE_FOR[name] || name] || HORSE_POSES.stand;
 // in-between frames blend the horse legs of their two source frames

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createFighter, stepFighter, attackTiming, frameName, NO_INPUT } from '../js/fighter.js';
 import { strike, applyHit, resolveHits } from '../js/combat.js';
 import {
-  WEAPONS, WEAPON_IDS, MAX_REACH, MAX_ENERGY, LONG_ATTACK_SLOW, LONG_REACH_BONUS, HEAVY_REACH,
+  WEAPONS, WEAPON_IDS, MAX_REACH, MAX_ENERGY, LONG_ATTACK_SLOW, LONG_REACH_BONUS, HEAVY_REACH, CHARGE_TIME,
   JUMP_ATTACK_MULT, GROUND_Y, canDoubleJump
 } from '../js/config.js';
 
@@ -37,7 +37,8 @@ test('long attack: walking forward, 1.2x slower, reach + half the average stride
   assert.equal(strike(f).reach, n.reach + LONG_REACH_BONUS);
   assert.ok(f.x - x0 > 20, 'steps forward during the long attack');
   // same bonus for every fighter
-  for (const w of WEAPON_IDS) { const g = attackWith(w, { right: true }); while (!strike(g)) step(g); assert.equal(strike(g).reach - WEAPONS[w].reach, LONG_REACH_BONUS, w); }
+  // same bonus for every fighter (the spear's forward thrust then reaches 1.3x further)
+  for (const w of WEAPON_IDS) { const g = attackWith(w, { right: true }); while (!strike(g)) step(g); assert.ok(Math.abs(strike(g).reach / (WEAPONS[w].longReach ?? 1) - WEAPONS[w].reach - LONG_REACH_BONUS) < 1e-9, w); }
   // standing still is a normal attack
   assert.equal(attackWith('sword', {}).attack.kind, 'normal');
 });
@@ -59,10 +60,12 @@ test('heavy attack: long-reach fighters (and taekwondo), walking backward, short
     const f = attackWith(w, { left: true });
     assert.equal(f.attack.kind, canDoubleJump(w) && !WEAPONS[w].heavy ? 'normal' : 'heavy', w);
   }
-  const f = attackWith('spear', { left: true });
-  while (!strike(f)) step(f, { ...NO_INPUT, left: true });
-  assert.equal(strike(f).reach, WEAPONS.spear.reach * HEAVY_REACH);
-  assert.equal(strike(f).dmg, WEAPONS.spear.power);
+  const reachOf = w => { const f = attackWith(w, { left: true }); while (!strike(f)) step(f, { ...NO_INPUT, left: true }); return strike(f); };
+  assert.equal(reachOf('sword').reach, WEAPONS.sword.reach * HEAVY_REACH);
+  assert.equal(reachOf('sword').dmg, WEAPONS.sword.power);
+  // spear and mace back-step attacks keep their full reach
+  assert.equal(reachOf('spear').reach, WEAPONS.spear.reach);
+  assert.equal(reachOf('mace').reach, WEAPONS.mace.reach);
 });
 
 test('heavy attack: armor takes damage without knockback or interruption', () => {
@@ -152,7 +155,7 @@ test('charged: holding attack chains a 0.5s charge after the first normal swing'
   holdAttack(f, total);
   assert.equal(f.attack.kind, 'charged');
   assert.equal(strike(f), null, 'no hit while charging');
-  holdAttack(f, 0.5);
+  holdAttack(f, CHARGE_TIME);
   assert.ok(strike(f), 'swings after the charge');
   // releasing during the charge cancels it
   const g = createFighter('sword', 400, 1);
@@ -168,7 +171,7 @@ test('charged: holding attack chains a 0.5s charge after the first normal swing'
 
 test('charged: breaks guard for half damage and +2 gauge to the guarder; full damage unguarded', () => {
   const att = createFighter('mace', 500, 1);
-  att.attack = { t: 0.5 + 0.01, kind: 'charged', aerial: false, hit: false };
+  att.attack = { t: CHARGE_TIME + 0.01, kind: 'charged', aerial: false, hit: false };
   const def = createFighter('sword', 560, -1); def.guard = def.guarding = true;
   const s = strike(att);
   const r = applyHit(att, def, s, never);

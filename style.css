@@ -92,6 +92,24 @@ h2 { margin: 0; font-size: calc(var(--u) * 5); }
 .portrait span { font-size: calc(var(--u) * 1.9); white-space: nowrap; letter-spacing: -.06em; max-width: 100%; overflow: hidden; font-weight: 700; padding: 2px 0; }
 .side[data-player="0"] .portrait.on { border-color: var(--p1); box-shadow: 0 0 0 2px var(--p1); }
 .side[data-player="1"] .portrait.on { border-color: var(--p2); box-shadow: 0 0 0 2px var(--p2); }
+.side { position: relative; }
+/* move list popup: covers the whole selection area of one side, fixed size, scrolled by the pad */
+.movelist {
+  position: absolute; inset: calc(var(--u) * -1); z-index: 5; display: flex; flex-direction: column;
+  background: #100c1a; border: 2px solid var(--accent); border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,.6);
+  padding: calc(var(--u) * 1.2) calc(var(--u) * 1.6);
+}
+.movelist header { display: flex; align-items: center; gap: calc(var(--u) * 1.2); }
+.movelist header img { width: calc(var(--u) * 6); height: calc(var(--u) * 6); border-radius: 8px; }
+.movelist header b { display: block; font-size: calc(var(--u) * 2.8); }
+.movelist header small { color: var(--muted); font-size: calc(var(--u) * 1.9); }
+.ml-body { flex: 1; overflow: hidden; margin: calc(var(--u) * .8) 0; scroll-behavior: smooth; }
+.ml-body table { width: 100%; border-collapse: collapse; font-size: calc(var(--u) * 2); }
+.ml-body tr { border-bottom: 1px solid var(--line); }
+.ml-body th { text-align: left; color: var(--accent); font-weight: 700; white-space: nowrap; padding: calc(var(--u) * .6) calc(var(--u) * 1) calc(var(--u) * .6) 0; vertical-align: top; }
+.ml-body td small { display: block; color: var(--muted); font-size: .85em; }
+.ml-body td.in { text-align: right; white-space: nowrap; font-weight: 800; color: #bfe6ff; padding-left: calc(var(--u) * 1); }
+.movelist footer { text-align: center; color: var(--muted); font-size: calc(var(--u) * 1.8); }
 .info { width: 100%; max-width: calc(var(--u) * 64); }
 .info .name { font-weight: 800; font-size: calc(var(--u) * 3); text-align: center; }
 .info .name small { color: var(--muted); font-weight: 500; font-size: .75em; }

@@ -5,7 +5,7 @@ import { NO_INPUT, createFighter, stepFighter } from '../js/fighter.js';
 import { readPad } from '../js/input.js';
 import {
   WEAPONS, SUPERS, SUPER_MAX, SUPER_HOLD, MAX_ENERGY, GROUND_Y, BODY_H, WORLD_W, VIEW_W, MAP_IDS, MAPS,
-  ARROW_RANGE, canDoubleJump
+  ARROW_RANGE, canDoubleJump, CHARGE_TIME
 } from '../js/config.js';
 import { generateMap, validateMap } from '../js/mapgen.js';
 
@@ -60,7 +60,7 @@ test('archer arrow: arc reaches 2/3 of the view, peaks at 1.2x body height, hits
   // in a game: holding attack fires an arrow that lands on a distant opponent at the end of the arc
   const g = fight('archer', 'sword'), [p, q] = g.fighters;
   p.x = 300; q.x = 300 + 16 + ARROW_RANGE - 4;
-  run(g, speed('archer') + 0.5 + 0.05, () => ({ ...NO_INPUT, attack: true }));
+  run(g, speed("archer") + CHARGE_TIME + 0.05, () => ({ ...NO_INPUT, attack: true }));
   assert.equal(g.projectiles.length, 1, 'arrow in flight');
   run(g, 1.2);
   assert.equal(q.energy, MAX_ENERGY - Math.round(WEAPONS.archer.power * 1.5));

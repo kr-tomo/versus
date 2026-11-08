@@ -2,7 +2,8 @@ import {
   WEAPONS, SUPERS, MAX_ENERGY, GROUND_Y, GRAVITY, JUMP_V, WALK_SPEED, KNOCKBACK_SPEED,
   DROP_THROUGH_TIME, ICE_ACCEL, ICE_DECEL, GUARD_MOVE, SUPER_MAX, SUPER_HOLD, HIT_STUN,
   LONG_ATTACK_SLOW, HEAVY_MOVE, DOUBLE_JUMP_V, FLIP_TIME, DIVE_SPEED, DIVE_LAND_RECOVERY, canDoubleJump,
-  TURN_DELAY, CHARGE_TIME, AIR_DASH_DIST, AIR_DASH_TIME, AIR_DASH_ATTACK
+  TURN_DELAY, CHARGE_TIME, AIR_DASH_DIST, AIR_DASH_TIME, AIR_DASH_ATTACK, BODY_H,
+  PLUNGE_HEIGHT, PLUNGE_SPEED, PLUNGE_LAND, BLINK_TAP, BLINK_HOLD, BLINK_DIST, BLINK_COOLDOWN
 } from './config.js';
 
 export const NO_INPUT = Object.freeze({ left: false, right: false, jump: false, down: false, attack: false, guard: false });
@@ -13,6 +14,7 @@ export function createFighter(weapon, x, facing) {
     energy: MAX_ENERGY, attack: null, guard: false, guarding: false, guardT: 0, stun: 0,
     meter: 0, charge: 0, super: null, kb: 0, kbDir: 0, drop: 0,
     canDouble: canDoubleJump(weapon), doubled: false, flipT: 0, airDash: null, wantFacing: facing, turnT: 0,
+    lastFwd: Infinity, blinkArm: null, blinkCD: 0, blinked: false,
     trapAcc: 0, inTrap: false, hitFlash: 0, ko: false, won: false, prevInput: NO_INPUT, walk: 0, t: 0
   };
 }
@@ -23,6 +25,7 @@ export function attackTiming(f) {
   const s = f.stats, k = f.attack?.kind;
   if (k === 'long') return { startup: s.startup * LONG_ATTACK_SLOW, active: s.active * LONG_ATTACK_SLOW, recovery: s.recovery * LONG_ATTACK_SLOW };
   if (k === 'dive') return { startup: 0.05, active: Infinity, recovery: DIVE_LAND_RECOVERY };
+  if (k === 'plunge') return { startup: 0.05, active: Infinity, recovery: PLUNGE_LAND };
   if (k === 'charged') return { startup: CHARGE_TIME, active: s.active, recovery: s.recovery };
   if (k === 'heavy' && s.heavyHold) return { startup: s.startup + s.heavyHold, active: s.active, recovery: s.recovery };
   return s;
@@ -30,15 +33,18 @@ export function attackTiming(f) {
 
 export function attackPhase(f) {
   if (!f.attack) return null;
-  if (f.attack.kind === 'dive') return f.attack.landed !== undefined ? 'recovery' : f.attack.t < 0.05 ? 'startup' : 'active';
+  if (untilLanding(f.attack.kind)) return f.attack.landed !== undefined ? 'recovery' : f.attack.t < 0.05 ? 'startup' : 'active';
   const { startup, active } = attackTiming(f), t = f.attack.t;
   if (t < startup) return 'startup';
   if (t < startup + active) return 'active';
   return 'recovery';
 }
 
+// dives and plunges stay active until they hit the ground, then recover briefly
+export const untilLanding = k => k === 'dive' || k === 'plunge';
+
 const attackOver = f => {
-  if (f.attack.kind === 'dive') return f.attack.landed !== undefined && f.attack.t - f.attack.landed >= DIVE_LAND_RECOVERY;
+  if (untilLanding(f.attack.kind)) return f.attack.landed !== undefined && f.attack.t - f.attack.landed >= attackTiming(f).recovery;
   const { startup, active, recovery } = attackTiming(f);
   return f.attack.t >= startup + active + recovery;
 };
@@ -93,8 +99,25 @@ export function stepFighter(f, input, dt, world) {
   let dash = null;
   if (f.super) {
     f.super.t += dt;
+    const hop = f.super.def.hop;
+    if (hop && !f.super.hopped && f.super.t >= hop.at && f.onGround) {
+      // a small 45° hop: equal forward and upward speed
+      f.super.hopped = true; f.vy = -hop.v; f.vx = f.facing * hop.v; f.onGround = false; f.platform = -1;
+    }
     dash = f.super.def.dash?.find(([a, b]) => f.super.t >= a && f.super.t < b);
     if (f.super.t >= f.super.def.time) f.super = null;
+  }
+
+  // dagger blink: tap forward twice and keep holding the second tap
+  f.lastFwd += dt; f.blinkCD = Math.max(0, f.blinkCD - dt); f.blinked = false;
+  if (f.stats.blink) {
+    const fwd = f.facing > 0 ? 'right' : 'left';
+    if (pressed(fwd)) { f.blinkArm = f.lastFwd < BLINK_TAP ? 0 : null; f.lastFwd = 0; }
+    else if (!input[fwd]) f.blinkArm = null;
+    else if (f.blinkArm !== null && (f.blinkArm += dt) >= BLINK_HOLD && canAct && !f.attack && f.blinkCD <= 0) {
+      f.x += f.facing * BLINK_DIST * (f.stats.height ?? BODY_H);
+      f.blinked = true; f.blinkArm = null; f.blinkCD = BLINK_COOLDOWN;
+    }
   }
 
   // guard comes up after the weapon's guardUp time
@@ -113,7 +136,9 @@ export function stepFighter(f, input, dt, world) {
   const held = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   if (canAct && !f.attack && !input.guard && !dashLocked(f) && pressed('attack')) {
     let kind = 'normal';
-    if (!f.onGround) kind = f.doubled && f.canDouble ? 'dive' : 'aerial';
+    if (!f.onGround) kind = f.doubled && f.canDouble ? 'dive'
+      // the sword plunges from high up: feet more than 1.8 body heights above the ground
+      : f.stats.plunge && GROUND_Y - f.y > PLUNGE_HEIGHT * (f.stats.height ?? BODY_H) ? 'plunge' : 'aerial';
     else if (held === f.facing) kind = 'long';
     else if (held === -f.facing && (!f.canDouble || f.stats.heavy)) kind = 'heavy';
     f.attack = { t: 0, kind, aerial: !f.onGround, hit: false, held: true };
@@ -139,10 +164,12 @@ export function stepFighter(f, input, dt, world) {
   }
   if (f.onGround && f.charge > 0) dir = 0;
   const target = dir * WALK_SPEED * f.stats.move * speed;
-  const diving = f.attack?.kind === 'dive' && f.attack.landed === undefined;
+  const diving = untilLanding(f.attack?.kind) && f.attack.landed === undefined;
+  const plunging = diving && f.attack.kind === 'plunge';
   if (f.ko) f.vx = approach(f.vx, 0, ICE_DECEL * dt);
   else if (f.super?.hover) { f.vx = 0; f.vy = 0; }   // carried by the super (game.js moves it)
   else if (f.super) f.vx = dash ? dash[2] * f.facing : f.onGround ? 0 : f.vx;
+  else if (plunging) { f.vx = 0; f.vy = PLUNGE_SPEED; }
   else if (diving) { f.vx = f.facing * DIVE_SPEED * Math.SQRT1_2; f.vy = DIVE_SPEED * Math.SQRT1_2; }
   else if (dashing(f)) { f.vx = f.airDash.dir * AIR_DASH_DIST / AIR_DASH_TIME; f.vy = 0; }
   else if (world.ice && f.onGround) f.vx = approach(f.vx, target, (dir ? ICE_ACCEL : ICE_DECEL) * dt);
@@ -175,7 +202,7 @@ export function stepFighter(f, input, dt, world) {
 
   if (f.onGround) {
     if (f.doubled) { f.doubled = false; f.flipT = 0; }
-    if (f.attack?.kind === 'dive' && f.attack.landed === undefined) { f.attack.landed = f.attack.t; f.vx = 0; }
+    if (untilLanding(f.attack?.kind) && f.attack.landed === undefined) { f.attack.landed = f.attack.t; f.vx = 0; }
   }
   if (f.onGround && Math.abs(f.vx) > 10) f.walk += Math.abs(f.vx) * dt;
 }
@@ -220,6 +247,7 @@ export function frameName(f) {
     const k = f.attack.kind, T = attackTiming(f), t = f.attack.t;
     const us = t / T.startup, ua = (t - T.startup) / T.active, ur = (t - T.startup - T.active) / T.recovery;
     if (k === 'dive') return ph === 'recovery' ? pick(['hit0', 'hit0>idle0'], (t - f.attack.landed) / DIVE_LAND_RECOVERY) : pick(['flip>dive', 'dive'], t / 0.1);
+    if (k === 'plunge') return ph === 'recovery' ? pick(['plunge>hit0', 'hit0'], (t - f.attack.landed) / PLUNGE_LAND) : pick(['jump>plunge', 'plunge'], t / 0.08);
     if (k === 'aerial') return ph === 'startup' ? pick(['jump', 'jump>jumpAtk0', 'jumpAtk0', 'jumpAtk0>jumpAtk'], us) : 'jumpAtk';
     if (k === 'long') {
       if (ph === 'startup') return pick(['idle0>longWind', 'longWind', 'longWind>longAtk0', 'longAtk0', 'longAtk0>longAtk'], us);
@@ -245,7 +273,7 @@ export function frameName(f) {
       return ur < 0.35 ? 'backKick' : pick(['backKick>backTurn', 'backTurn', 'backTurn>idle0'], (ur - 0.35) / 0.65);
     }
     if (k === 'charged') {
-      if (ph === 'startup') return us < 0.2 ? pick(['idle0>chargeHold', 'chargeHold'], us / 0.2) : Math.floor(t / 0.06) % 2 ? 'chargeHold' : 'chargeHold>chargeAtk';
+      if (ph === 'startup') return pick(['idle0>chargeHold', 'chargeHold'], us / 0.4);
       return ph === 'active' ? pick(['chargeHold>chargeAtk', 'chargeAtk'], ua * 2) : pick(RECOVER('chargeAtk'), ur);
     }
     if (ph === 'startup') return pick(WINDUP, us);

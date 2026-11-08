@@ -57,6 +57,17 @@ function makeFxTextures(scene) {
     g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,1)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
   });
+  canvasTexture(scene, 'fx-blueglow', 128, 128, (ctx, w, h) => {
+    const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    g.addColorStop(0, 'rgba(150,215,255,.9)'); g.addColorStop(0.45, 'rgba(60,140,255,.45)'); g.addColorStop(1, 'rgba(30,80,255,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  });
+  // one tongue of blue flame: white-hot core, blue edge, pointed tip
+  canvasTexture(scene, 'fx-flame', 32, 64, (ctx, w, h) => {
+    const g = ctx.createRadialGradient(16, 46, 2, 16, 40, 30);
+    g.addColorStop(0, 'rgba(200,236,255,.85)'); g.addColorStop(0.35, 'rgba(90,170,255,.7)'); g.addColorStop(0.75, 'rgba(30,90,255,.4)'); g.addColorStop(1, 'rgba(20,60,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(16, 0); ctx.bezierCurveTo(30, 22, 32, 40, 28, 52); ctx.quadraticCurveTo(16, 66, 4, 52); ctx.bezierCurveTo(0, 40, 2, 22, 16, 0); ctx.fill();
+  });
   canvasTexture(scene, 'fx-ring', 96, 96, (ctx, w) => {
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(w / 2, w / 2, w / 2 - 6, 0, Math.PI * 2); ctx.stroke();
   });
@@ -207,17 +218,11 @@ class FightScene extends Phaser.Scene {
       const c = theme.characters[w], pages = sh.chars[i], s = pages[0];
       const mk = () => this.add.sprite(0, 0, pages.pageOf.idle0, 'idle0').setOrigin(c.origin[0] / c.cell[0], c.origin[1] / c.cell[1]);
       const ghosts = [0, 1, 2].map(() => mk().setVisible(false).setDepth(9).setTint(0xffd27a).setTintMode(Phaser.TintModes.ADD));
-      const aura = this.add.image(0, 0, 'fx-aura').setBlendMode(Phaser.BlendModes.ADD).setDepth(9).setVisible(false);
+      const aura = this.add.image(0, 0, 'fx-blueglow').setBlendMode(Phaser.BlendModes.ADD).setDepth(9).setVisible(false);
       const sprite = mk().setDepth(10);
       let glow = null;
-      try { sprite.enableFilters(); glow = sprite.filters.internal.addGlow(0xffc83a, 6, 0, 1, false, 10, 12); glow.active = false; } catch { glow = null; }
-      // particles converging on the fighter while charging the super
-      const charge = this.add.particles(0, 0, 'fx-dot', {
-        emitting: false, lifespan: 320, scale: { start: 0.35, end: 0.05 }, alpha: { start: 0, end: 1 }, blendMode: 'ADD', tint: [0xffe27a, 0xffffff],
-        emitZone: { type: 'edge', source: new Phaser.Geom.Circle(0, 0, 70), quantity: 24 },
-        emitCallback: p => { p.velocityX = -p.x / 0.32; p.velocityY = -p.y / 0.32; }
-      }).setDepth(11);
-      return { c, k: s.k, pageOf: pages.pageOf, sprite, ghosts, aura, glow, charge };
+      try { sprite.enableFilters(); glow = sprite.filters.internal.addGlow(0x5aaeff, 6, 0, 1, false, 10, 12); glow.active = false; } catch { glow = null; }
+      return { c, k: s.k, pageOf: pages.pageOf, sprite, ghosts, aura, glow };
     });
 
     const P = (cfg) => this.add.particles(0, 0, cfg.texture || 'fx-dot', { emitting: false, ...cfg }).setDepth(cfg.depth ?? 20);
@@ -425,7 +430,7 @@ class FightScene extends Phaser.Scene {
       if (f.attack && f.attack !== p.attack) this.sfx(f.stats.power >= 18 ? 'swingHeavy' : 'swing', { volume: 0.55, rate: rnd(0.92, 1.08) });
       if (p.onGround && !f.onGround && f.vy < 0) { this.fx.dust.explode(5, f.x, f.y); this.sfx('jump', { volume: 0.4 }); }
       if (f.doubled && !p.doubled) { this.ring(f.x, f.y, 0xffffff, 0.8); this.sfx('jump', { volume: 0.4, rate: 1.3 }); }
-      if (f.attack?.kind === 'dive' && f.attack.landed !== undefined && p.diveLanded === undefined && p.attack === f.attack) {
+      if ((f.attack?.kind === 'dive' || f.attack?.kind === 'plunge') && f.attack.landed !== undefined && p.diveLanded === undefined && p.attack === f.attack) {
         this.fx.dust.explode(14, f.x, f.y);
         this.spawnDebris(f.x + f.facing * 10, f.y - 4, 4, f.facing);
         this.cameras.main.shake(120, 0.006);
@@ -452,11 +457,11 @@ class FightScene extends Phaser.Scene {
         if (this.trapT[i] <= 0) { this.trapT[i] = 0.16; this.fx.trap.explode(5, f.x, GROUND_Y - 4); if (Math.random() < 0.4) this.sfx('trap', { volume: 0.35 }); }
       }
       // stag beetle air dash: a streak of afterimage dust
+      if (f.blinked) this.sfx('miss', { volume: 0.6, rate: 1.8 });
       if (f.airDash && !p.airDash) { this.ring(f.x, f.y - 40, 0xffd27a, 0.9); this.sfx('miss', { volume: 0.5, rate: 1.4 }); }
       if (f.attack?.fired && !p.fired) this.sfx('bow', { volume: 0.7 });
       if (f.super?.def.spin && !p.spin) this.sfx('whirl', { volume: 0.7 });
-      // charged attack: a rising hum while it charges
-      if (f.attack?.kind === 'charged' && p.attack?.kind !== 'charged') this.sfx('charge', { volume: 0.35, rate: 1.6 });
+
       // super dash: dust trail from the feet
       if (f.super && f.onGround && Math.abs(f.vx) > 150 && Math.random() < 0.5) this.fx.dust.explode(2, f.x - f.facing * 10, f.y);
       Object.assign(p, { fired: f.attack?.fired, spin: !!f.super?.def.spin, airDash: f.airDash, attack: f.attack, onGround: f.onGround, vy: f.vy, charge: f.charge, ko: f.ko, doubled: f.doubled, diveLanded: f.attack?.landed });
@@ -551,14 +556,12 @@ class FightScene extends Phaser.Scene {
       });
       // aura while the gauge is full, charging or in a super
       const full = f.meter >= SUPER_MAX && !f.ko;
-      const charging = f.attack?.kind === 'charged' && f.attack.t < 0.5;
-      if (f.super || f.charge > 0 || full || charging) {
-        const s = f.super ? 1 : f.charge > 0 ? 0.45 + 0.55 * f.charge / SUPER_HOLD : charging ? 0.3 + f.attack.t * 1.2 : 0.3 + 0.12 * Math.sin(g.t * 8);
-        v.aura.setVisible(true).setPosition(f.x, f.y - height(f) / 2).setScale(height(f) * 1.6 / 128).setAlpha(s);
+      // super: blue flames that grow while the attack+guard hold charges, burn big during the super
+      const fire = f.super ? Math.min(1, (f.super.def.time - f.super.t) * 3) : f.charge > 0 ? 0.2 + 0.8 * f.charge / SUPER_HOLD : full ? 0.12 : 0;
+      if (fire > 0) {
+        v.aura.setVisible(true).setPosition(f.x, f.y - height(f) * 0.45).setScale(height(f) * (0.8 + 0.8 * fire) / 128).setAlpha(0.2 + 0.3 * fire);
+        if (Math.random() < 0.2 + 0.45 * fire) this.flame(f, fire);
       } else v.aura.setVisible(false);
-      v.charge.setPosition(f.x, f.y - height(f) / 2);
-      if (f.attack?.kind === 'charged' && f.attack.t < 0.5) v.charge.emitParticle(1);
-      if (f.charge > 0) v.charge.emitParticle(2);
     });
     this.syncProjectiles(g);
     this.drawWhirl(g);
@@ -594,6 +597,17 @@ class FightScene extends Phaser.Scene {
   }
 
   // Thunder whirlwind around a taekwondo fighter during the super.
+  // One rising tongue of blue flame around the fighter; size follows the charge.
+  flame(f, k) {
+    const h = height(f), hw = halfW(f) + 6 + 14 * k;
+    // mostly behind the body so the fighter stays readable; a few thin tongues lick in front
+    const front = Math.random() < 0.2;
+    const img = this.add.image(f.x + (Math.random() * 2 - 1) * hw, f.y + 2, 'fx-flame').setOrigin(0.5, 1)
+      .setBlendMode(Phaser.BlendModes.ADD).setDepth(front ? 11 : 9).setAlpha(front ? 0.45 : 0.8)
+      .setScale((0.35 + 0.7 * k) * (0.7 + Math.random() * 0.5) * (front ? 0.6 : 1), (0.5 + 1.1 * k) * (0.7 + Math.random() * 0.6));
+    this.tweens.add({ targets: img, y: img.y - h * (0.3 + 0.5 * k), scaleX: img.scaleX * 0.3, alpha: 0, duration: 380 + 260 * k, ease: 'Quad.easeOut', onComplete: () => img.destroy() });
+  }
+
   // A lightning bolt striking down onto (x, groundY).
   bolt(x, y, s = 1) {
     const b = this.add.image(x, y, 'fx-bolt').setOrigin(0.5, 1).setScale(s * 0.9, s).setBlendMode(Phaser.BlendModes.ADD).setDepth(15)

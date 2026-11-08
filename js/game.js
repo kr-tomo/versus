@@ -103,6 +103,11 @@ export class Game {
         me.super.quaked = true;
         this.effects.push({ type: 'quake', x: me.x, y: me.y, dir: me.facing, t: 0 });
       }
+      if (me.blinked) {
+        // dagger blink: vanish and reappear three body heights ahead
+        const d = me.facing * 3 * (me.stats.height ?? BODY_H);
+        this.effects.push({ type: 'smoke', x: me.x - d, y: me.y - 40, t: 0 }, { type: 'smoke', x: me.x, y: me.y - 40, t: 0 });
+      }
       this.updateSeek(me, op, dt);
       const bomb = me.super?.def.bomb;
       if (bomb && !me.super.summoned && me.super.t >= bomb.at) {

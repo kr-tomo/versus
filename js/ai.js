@@ -1,4 +1,4 @@
-import { BODY_HALF_W, SUPER_MAX, SUPERS, LONG_REACH_BONUS, HEAVY_REACH, ARROW_RANGE, VIEW_W } from './config.js';
+import { BODY_HALF_W, SUPER_MAX, SUPERS, LONG_REACH_BONUS, HEAVY_REACH, ARROW_RANGE, VIEW_W, CHARGE_TIME } from './config.js';
 import { attackPhase } from './fighter.js';
 
 // guard: chance to notice an incoming attack; guardLag: extra delay before raising the guard
@@ -67,7 +67,7 @@ export class AI {
     // archer at a distance: hold attack for the charged bow shot
     if (me.stats.bow && me.onGround && !me.attack && gap > 160 && gap < ARROW_RANGE * 0.9 && Math.abs(op.y - me.y) < 60 && r() < p.attack * 0.4) {
       const s = me.stats;
-      this.holdAttack = s.startup + s.active + s.recovery + 0.55;
+      this.holdAttack = s.startup + s.active + s.recovery + CHARGE_TIME + 0.05;
       inp.attack = true;
       return;
     }
@@ -82,7 +82,7 @@ export class AI {
     if (gap <= myReach * 0.9 && !me.attack) {
       if (op.guarding && r() < p.attack * 0.6) {
         const s = me.stats;
-        this.holdAttack = s.startup + s.active + s.recovery + 0.55;
+        this.holdAttack = s.startup + s.active + s.recovery + CHARGE_TIME + 0.05;
         inp.attack = true;
         return;
       }
