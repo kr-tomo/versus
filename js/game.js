@@ -1,7 +1,7 @@
 import {
   MAPS, MAP_IDS, VIEW_W, WORLD_W, SPAWN_X, BODY_HALF_W, BODY_H, GROUND_Y,
   HIT_CONFIRM, HITSTOP_BASE, HITSTOP_PER_DMG, HITSTOP_MAX, HITSTOP_GUARD, HIT_STUN, KNOCKBACK_PER_DMG,
-  ARROW_RANGE, ARROW_APEX, ARROW_SPEED, ARROW_MULT
+  ARROW_RANGE, ARROW_APEX, ARROW_SPEED, ARROW_MULT, BULLET_RANGE, BULLET_SPEED, BULLET_MULT
 } from './config.js';
 import { createFighter, stepFighter, NO_INPUT, dashing, attackPhase } from './fighter.js';
 import { detectHits, confirmHit } from './combat.js';
@@ -23,6 +23,15 @@ function makeArrow(f, owner) {
   };
 }
 
+// The cowboy's revolver: level flight from the hand, BULLET_RANGE body heights, then it drops.
+function makeBullet(f, owner) {
+  const h = f.stats.height ?? BODY_H, x0 = f.x + f.facing * 30;
+  return { type: 'bullet', owner, dir: f.facing, x0, x: x0, y: f.y - h * 0.62, range: BULLET_RANGE * h, dmg: Math.round(f.stats.power * BULLET_MULT), t: 0, dropping: false, vx: 0, vy: 0 };
+}
+
+const fHalfW = f => f.stats.halfW ?? BODY_HALF_W;
+const fHeight = f => f.stats.height ?? BODY_H;
+
 // Bodies push each other apart; jumping over the opponent is still possible.
 export function separate(a, b) {
   if (Math.abs(a.y - b.y) >= BODY_H * 0.8) return;
@@ -32,6 +41,9 @@ export function separate(a, b) {
   a.x -= dir * push;
   b.x += dir * push;
 }
+
+const hitType = e => e.parried ? 'parry' : e.evaded ? 'miss' : e.broken ? 'break' : e.guarded ? 'guard' : e.armored ? 'armor' : 'hit';
+const hitstopFor = e => e.evaded ? 0 : e.parried ? HITSTOP_GUARD * 2 : e.guarded ? HITSTOP_GUARD : Math.min(HITSTOP_MAX, HITSTOP_BASE + e.damage * HITSTOP_PER_DMG);
 
 export const INTRO_TIME = 1.6;
 export const ROUND_END_TIME = 2.4;
@@ -67,7 +79,7 @@ export class Game {
     this.projectiles = [];
   }
 
-  get world() { return { platforms: this.layout.platforms, ice: this.map.ice }; }
+  get world() { return { platforms: this.layout.platforms, ice: this.map.ice, gravity: this.map.gravity ?? 1 }; }
 
   update(dt, inputs) {
     this.t = (this.t || 0) + dt;
@@ -116,11 +128,17 @@ export class Game {
         const x0 = Math.max(-120, Math.min(WORLD_W + 120, me.x - me.facing * 360));
         this.projectiles.push({ type: 'bomb', owner: i, x0, x: x0, cx: this.cam + VIEW_W / 2, y: GROUND_Y - 60, t: 0, ...bomb });
       }
-      // the archer's charged shot leaves the bow as the release frame starts
-      if (me.attack?.kind === 'charged' && me.stats.bow && !me.attack.fired && attackPhase(me) === 'active') {
+      // the archer's charged shot leaves the bow as the release frame starts (the cowboy fires his revolver)
+      if (me.attack?.kind === 'charged' && (me.stats.bow || me.stats.gun) && !me.attack.fired && attackPhase(me) === 'active') {
         me.attack.fired = true;
-        this.projectiles.push(makeArrow(me, i));
+        if (me.stats.gun) {
+          const b = makeBullet(me, i);
+          this.projectiles.push(b);
+          this.effects.push({ type: 'muzzle', x: b.x, y: b.y, dir: me.facing, t: 0, life: 0.25 });
+        } else this.projectiles.push(makeArrow(me, i));
       }
+      if (me.reel && me.reel.t === 0) this.effects.push({ type: 'reel', who: i, x: me.x, y: me.y, dir: me.reel.dir, t: 0, life: 0.3 });
+      this.updateLasso(me, op, i, dt);
       const bull = me.super?.def.bull;
       if (bull && !me.super.summoned && me.super.t >= bull.at) {
         // the bull enters from the screen edge behind the farmer and runs the whole map
@@ -153,6 +171,34 @@ export class Game {
   }
 
   setPhase(p) { this.phase = p; this.phaseT = 0; }
+
+  // Cowboy's lasso: at lasso.at an opponent within the radius (any direction) is caught and pulled
+  // in front of him over lasso.pull seconds; the lashes that follow only land on a caught opponent.
+  updateLasso(me, op, i, dt) {
+    const las = me.super?.def.lasso, sp = me.super;
+    if (!las) return;
+    if (!sp.lassoed && sp.t >= las.at) {
+      sp.lassoed = true;
+      const dx = op.x - me.x, dy = (op.y - fHeight(op) / 2) - (me.y - fHeight(me) / 2);
+      const free = !op.ko && !op.super && !dashing(op);
+      if (free && Math.hypot(dx, dy) <= las.radius) {
+        const tx = Math.max(20, Math.min(WORLD_W - 20, me.x + me.facing * (fHalfW(me) + fHalfW(op) + 14)));
+        sp.caught = { from: { x: op.x, y: op.y }, to: { x: tx, y: me.y }, t: 0, pull: las.pull };
+        op.stun = Math.max(op.stun, sp.def.time - sp.t); op.attack = null; op.charge = 0; op.guard = op.guarding = false;
+        op.airDash = null; op.reel = null; op.kb = 0;
+        this.effects.push({ type: 'lasso', who: i, x: op.x, y: op.y - 40, t: 0, life: 0.5 });
+      } else this.effects.push({ type: 'lassoMiss', who: i, x: me.x + me.facing * 120, y: me.y - 40, t: 0, life: 0.4 });
+    }
+    const c = sp.caught;
+    if (c && c.t < c.pull) {
+      c.t = Math.min(c.pull, c.t + dt);
+      const u = c.t / c.pull, e = u * (2 - u);
+      op.x = c.from.x + (c.to.x - c.from.x) * e;
+      op.y = c.from.y + (c.to.y - c.from.y) * e - Math.sin(Math.PI * u) * 30;
+      op.vx = op.vy = 0; op.kb = 0;
+      op.onGround = u >= 1; op.platform = u >= 1 ? me.platform : -1;
+    }
+  }
 
   // Whirlwind kick: at seek.at, an opponent in front within range (or above) pulls the kicker to it.
   updateSeek(me, op, dt) {
@@ -191,6 +237,21 @@ export class Game {
           const s = { kind: 'charged', dmg: p.dmg, kb: p.dmg * KNOCKBACK_PER_DMG, stun: HIT_STUN };
           this.hitFrom({ facing: p.dir, x: p.x, stats: {} }, op, s, p.x, 1 - p.owner);
         } else if (p.u >= 1) { p.done = true; this.effects.push({ type: 'arrowStuck', x: p.x, y: GROUND_Y, dir: p.dir, t: 0, life: 0.8 }); }
+      } else if (p.type === 'bullet') {
+        if (!p.dropping) {
+          p.x += p.dir * BULLET_SPEED * dt;
+          if (Math.abs(p.x - p.x0) >= p.range) { p.x = p.x0 + p.dir * p.range; p.dropping = true; p.vx = p.dir * 60; p.vy = 0; }
+          const inside = Math.abs(op.x - p.x) < hw + 4 && p.y > op.y - h - 4 && p.y < op.y + 2;
+          if (live && !op.ko && !op.super && !dashing(op) && inside) {
+            p.done = true;
+            const s = { kind: 'charged', dmg: p.dmg, kb: p.dmg * KNOCKBACK_PER_DMG, stun: HIT_STUN };
+            this.hitFrom({ facing: p.dir, x: p.x, stats: {} }, op, s, p.x, 1 - p.owner);
+          }
+        } else {
+          // spent: falls straight to the ground, harmless
+          p.vy += 2600 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+          if (p.y >= GROUND_Y) { p.done = true; this.effects.push({ type: 'bulletDrop', x: p.x, y: GROUND_Y, t: 0, life: 0.5 }); }
+        }
       } else if (p.type === 'bomb') {
         const u = Math.min(1, p.t / p.flight), cx = p.cx;
         p.x = p.x0 + (cx - p.x0) * u;
@@ -210,9 +271,9 @@ export class Game {
 
   // Applies a hit that doesn't come from a fighter's own hitbox (arrows, bombs, the bull).
   hitFrom(att, def, s, x, who) {
-    const e = confirmHit({ att, def, s, x }, this.rand, { lateGuard: def.guarding });
-    this.effects.push({ type: e.evaded ? 'miss' : e.broken ? 'break' : e.guarded ? 'guard' : 'hit', who, big: !!s.super || e.damage >= 18, x: e.x, y: e.y, dmg: e.damage, dir: att.facing, t: 0 });
-    if (!e.evaded) this.hitstop = Math.max(this.hitstop, e.guarded ? HITSTOP_GUARD : Math.min(HITSTOP_MAX, HITSTOP_BASE + e.damage * HITSTOP_PER_DMG));
+    const e = confirmHit({ att, def, s, x }, this.rand, { lateGuard: def.guarding, parry: true });
+    this.effects.push({ type: hitType(e), who, big: !!s.super || e.damage >= 18, x: e.x, y: e.y, dmg: e.damage, dir: att.facing, t: 0 });
+    this.hitstop = Math.max(this.hitstop, hitstopFor(e));
     return e;
   }
 
@@ -244,17 +305,18 @@ export class Game {
     const trade = due.length > 1 || this.pending.some(p => due.some(d => d.att === p.def));
     for (const p of due) {
       if (p.def.super || p.def.ko || (dashing(p.def) && !p.s.sure)) continue;
-      const e = confirmHit(p, this.rand, { lateGuard: p.def.guarding });
+      const e = confirmHit(p, this.rand, { lateGuard: p.def.guarding, parry: true });
       const who = this.fighters.indexOf(p.def);
-      this.effects.push({ type: e.evaded ? 'miss' : e.broken ? 'break' : e.guarded ? 'guard' : e.armored ? 'armor' : 'hit', who, big: e.super || e.damage >= 20, x: e.x, y: e.y, dmg: e.damage, dir: p.att.facing, t: 0 });
-      if (!e.evaded) this.hitstop = Math.max(this.hitstop, e.guarded ? HITSTOP_GUARD : Math.min(HITSTOP_MAX, HITSTOP_BASE + e.damage * HITSTOP_PER_DMG));
+      this.effects.push({ type: hitType(e), who, big: e.super || e.damage >= 20, x: e.x, y: e.y, dmg: e.damage, dir: p.att.facing, t: 0, ...(e.parried ? { life: 0.6, ax: p.att.x, ay: p.att.y } : {}) });
+      this.hitstop = Math.max(this.hitstop, hitstopFor(e));
     }
     if (trade && due.length) this.effects.push({ type: 'trade', x: (a.x + b.x) / 2, y: Math.min(a.y, b.y) - 100, t: 0, life: 0.9 });
   }
 
   applyTrap(f, dt) {
     const onTrap = f.onGround && f.platform < 0 && this.layout.traps.some(t => f.x > t.x + 4 && f.x < t.x + t.w - 4);
-    if (onTrap && !f.inTrap && this.map.trapReact) this.effects.push({ type: 'scold', x: f.x, who: this.fighters.indexOf(f), t: 0, life: 1.1 });
+    // stepping in sets the trap off once: the guard scolds, the crocodile bites, the crab pinches
+    if (onTrap && !f.inTrap && this.map.trapEvent) this.effects.push({ type: this.map.trapEvent, x: f.x, who: this.fighters.indexOf(f), t: 0, life: 1.1 });
     f.inTrap = onTrap;
     if (!onTrap) { f.trapAcc = 0; return; }
     f.trapAcc += dt * this.map.trapDps;

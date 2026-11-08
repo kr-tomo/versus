@@ -5,6 +5,7 @@
 // platform(w): local coords, x 0..w, top surface y=0
 import { OL, f, rng } from './rig.js';
 import { MAP_ART_2 } from './maps2.js';
+import { MAP_ART_3 } from './maps3.js';
 
 export const G = 316;
 export const PLATFORM_WIDTHS = [120, 150, 180, 210];
@@ -189,4 +190,4 @@ const tundra = {
   }
 };
 
-export const MAP_ART = { lava, jungle, seoul, tundra, ...MAP_ART_2 };
+export const MAP_ART = { lava, jungle, seoul, tundra, ...MAP_ART_2, ...MAP_ART_3 };

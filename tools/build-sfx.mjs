@@ -74,6 +74,17 @@ const SFX = {
   boom:   render(1.6, [{ type: 'noise', cut: t => 0.5 * Math.exp(-t * 3) + 0.03, a: 0.005, d: 0.45, gain: 1.6 }, { freq: t => 70 * Math.exp(-t * 1.2), d: 0.5, gain: 1.2 }, { type: 'square', freq: 38, d: 0.3, gain: 0.3 }]),
   bow:    render(0.4, [{ type: 'saw', freq: t => 160 + Math.exp(-t * 30) * 300, a: 0.002, d: 0.12, gain: 0.5 }, { type: 'noise', cut: t => 0.2 + t, a: 0.03, d: 0.08, gain: 0.5 }]),
   whirl:  render(1.0, [{ type: 'noise', cut: t => 0.08 + 0.06 * Math.sin(t * 40), a: 0.15, d: 0.4, gain: 1 }, { type: 'square', freq: t => 90 + Math.sin(t * 30) * 30, at: 0.3, d: 0.15, gain: 0.3 }, { type: 'noise', cut: () => 0.7, at: 0.45, d: 0.05, gain: 0.7 }]),
+  // the old charge hum compressed to the 0.3s charge (the stage plays it slower for longer loads)
+  chargeUp: render(0.3, [{ type: 'saw', freq: t => 110 + t / 0.3 * 330, a: 0.09, d: 0.15, gain: 0.25 }, { freq: t => 220 + t / 0.3 * 660, a: 0.09, d: 0.15, gain: 0.3 }]),
+  // parry: a short, bright metallic "ting"
+  parry:  render(0.5, [{ freq: 2637, d: 0.12, gain: 0.6 }, { freq: 3951, d: 0.08, gain: 0.45 }, { freq: 5274, d: 0.05, gain: 0.3 }, { freq: 1318, d: 0.18, gain: 0.25 }, { type: 'noise', cut: () => 0.95, d: 0.006, gain: 0.5 }]),
+  gun:    render(0.45, [{ type: 'noise', cut: t => 0.9 - t * 1.5, a: 0.001, d: 0.06, gain: 1.4 }, { freq: t => 160 * Math.exp(-t * 8), d: 0.08, gain: 0.9 }, { type: 'noise', cut: () => 0.05, at: 0.04, d: 0.15, gain: 0.4 }]),
+  // whip crack: a swish into a sharp snap
+  crack:  render(0.3, [{ type: 'noise', cut: t => 0.05 + t * 3, a: 0.06, d: 0.02, gain: 0.5 }, { type: 'noise', cut: () => 0.98, at: 0.09, a: 0.001, d: 0.012, gain: 1.4 }, { freq: 2200, at: 0.09, d: 0.02, gain: 0.3 }]),
+  chomp:  render(0.35, [{ type: 'noise', cut: () => 0.3, d: 0.03, gain: 0.8 }, { freq: t => 140 - t * 200, d: 0.05, gain: 0.8 }, { type: 'noise', cut: () => 0.5, at: 0.12, d: 0.03, gain: 0.7 }]),
+  snip:   render(0.3, [{ freq: 1800, d: 0.02, gain: 0.5 }, { type: 'noise', cut: () => 0.8, d: 0.01, gain: 0.5 }, { freq: 2100, at: 0.12, d: 0.02, gain: 0.5 }, { type: 'noise', cut: () => 0.8, at: 0.12, d: 0.01, gain: 0.5 }]),
+  // VS slam: a thunderclap with a fiery roar
+  vs:     render(1.0, [{ type: 'noise', cut: () => 0.9, a: 0.001, d: 0.04, gain: 1.2 }, { type: 'noise', cut: t => 0.25 * Math.exp(-t * 2) + 0.02, a: 0.01, d: 0.35, gain: 1.2 }, { freq: t => 60 * Math.exp(-t), d: 0.4, gain: 0.9 }, { type: 'saw', freq: 110, at: 0.02, d: 0.25, gain: 0.25 }]),
   win:    render(1.1, [523, 659, 784, 1047].map((f, i) => ({ type: 'square', freq: f, at: i * 0.12, d: i === 3 ? 0.4 : 0.1, gain: 0.3 })))
 };
 

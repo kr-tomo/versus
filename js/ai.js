@@ -1,11 +1,11 @@
-import { BODY_HALF_W, SUPER_MAX, SUPERS, LONG_REACH_BONUS, HEAVY_REACH, ARROW_RANGE, VIEW_W, CHARGE_TIME } from './config.js';
-import { attackPhase } from './fighter.js';
+import { BODY_HALF_W, BODY_H, HIT_CONFIRM, PARRY_WINDOW, SUPER_MAX, SUPERS, LONG_REACH_BONUS, HEAVY_REACH, ARROW_RANGE, VIEW_W, CHARGE_TIME, GUN_LOAD, BULLET_RANGE, AIR_LASH_REACH } from './config.js';
+import { attackPhase, attackTiming } from './fighter.js';
 
 // guard: chance to notice an incoming attack; guardLag: extra delay before raising the guard
 // (added to the weapon's own guardUp), so even hard misses blocks sometimes.
 const LEVELS = {
-  easy: { react: 0.45, guard: 0.25, guardLag: 0.12, attack: 0.5, avoidTrap: 0.5, spacing: false, punish: false, jump: 0.04, superUse: 0.15 },
-  hard: { react: 0.14, guard: 0.5, guardLag: 0.08, attack: 0.9, avoidTrap: 1, spacing: true, punish: true, jump: 0.08, superUse: 0.6 }
+  easy: { react: 0.45, guard: 0.25, guardLag: 0.12, attack: 0.5, avoidTrap: 0.5, spacing: false, punish: false, jump: 0.04, superUse: 0.15, parry: 0.02, reel: 0.1 },
+  hard: { react: 0.14, guard: 0.5, guardLag: 0.08, attack: 0.9, avoidTrap: 1, spacing: true, punish: true, jump: 0.08, superUse: 0.6, parry: 0.06, reel: 0.3 }
 };
 const halfW = f => f.stats.halfW ?? BODY_HALF_W;
 
@@ -26,6 +26,13 @@ export class AI {
     if (this.charging) {
       if (me.super || me.stun > 0 || me.meter < SUPER_MAX || !me.onGround) this.charging = false;
       else return { ...this.input, attack: true, guard: true };
+    }
+    // scripted taps (the cowboy's back double-tap + hold)
+    if (this.seq?.length) {
+      const st = this.seq[0];
+      st[0] -= dt;
+      if (st[0] <= 0) this.seq.shift();
+      return { ...this.input, attack: false, guard: false, left: false, right: false, ...st[1] };
     }
     // keep holding attack to chain a charged (guard-breaking) swing
     if (this.holdAttack > 0) { this.holdAttack -= dt; this.input.attack = true; return { ...this.input }; }
@@ -52,9 +59,25 @@ export class AI {
 
     // threatened by an incoming attack (or a super, which can't be interrupted)
     const threat = op.super || op.charge > 0 || ((opPhase === 'startup' || opPhase === 'active') && gap < opReach + 20);
+    // now and then: a parry — let go of guard, then tap it just before the swing lands
+    if (!op.super && opPhase === 'startup' && gap < opReach + 20 && !me.attack && r() < p.parry) {
+      const left = (attackTiming(op).startup - op.attack.t) / (op.attack.speed ?? 1);
+      this.pendingGuard = Math.max(0.01, left - 0.02);
+      this.cool = this.pendingGuard + 0.25;
+      return;
+    }
     if (threat && r() < p.guard) {
       // back off slowly behind the guard and hold it long enough to come up
       this.pendingGuard = p.guardLag * (0.5 + r());
+      // a press that lands inside the parry window would be a parry: the computer only gets that
+      // right now and then — otherwise it raises the guard at once, or is simply too late
+      // (an active swing may connect any moment: treat it as already too close)
+      const confirmIn = op.super ? Infinity : opPhase === 'startup' ? (attackTiming(op).startup - op.attack.t) / (op.attack.speed ?? 1) + HIT_CONFIRM
+        : opPhase === 'active' ? 0 : Infinity;
+      if (confirmIn - this.pendingGuard <= PARRY_WINDOW + 0.04 && r() >= p.parry) {
+        if (confirmIn > PARRY_WINDOW + 0.05) this.pendingGuard = 0.001;
+        else { this.pendingGuard = 0; move(-dir); return; }
+      }
       this.cool = Math.max(this.cool, this.pendingGuard + me.stats.guardUp + 0.25);
       move(-dir);
       return;
@@ -64,11 +87,18 @@ export class AI {
     const sup = SUPERS[me.weapon];
     const superReady = sup.bomb ? Math.abs(op.x - (game.cam + VIEW_W / 2)) < sup.bomb.radius * 0.7 : gap <= sup.range;
     if (me.meter >= SUPER_MAX && me.onGround && !me.attack && superReady && r() < p.superUse) { this.charging = true; return; }
-    // archer at a distance: hold attack for the charged bow shot
-    if (me.stats.bow && me.onGround && !me.attack && gap > 160 && gap < ARROW_RANGE * 0.9 && Math.abs(op.y - me.y) < 60 && r() < p.attack * 0.4) {
+    // archer at a distance: hold attack for the charged bow shot (the cowboy for his revolver)
+    const shotRange = me.stats.gun ? BULLET_RANGE * BODY_H : ARROW_RANGE;
+    if ((me.stats.bow || me.stats.gun) && me.onGround && !me.attack && gap > 140 && gap < shotRange * 0.9 && Math.abs(op.y - me.y) < 40 && r() < p.attack * 0.4) {
       const s = me.stats;
-      this.holdAttack = s.startup + s.active + s.recovery + CHARGE_TIME + 0.05;
+      this.holdAttack = s.startup + s.active + s.recovery + (s.gun ? GUN_LOAD : CHARGE_TIME) + 0.05;
       inp.attack = true;
+      return;
+    }
+    // cowboy crowded up close: double-tap back and hold to reel away
+    if (me.stats.reel && me.onGround && !me.attack && me.reelCD <= 0 && gap < 30 && r() < p.reel) {
+      const back = dir > 0 ? { left: true } : { right: true };
+      this.seq = [[0.04, back], [0.04, {}], [0.16, back]];
       return;
     }
 
@@ -112,8 +142,10 @@ export class AI {
     // stag beetle: air dash toward a distant opponent
     if (!me.onGround && me.stats.airDash && !me.doubled && gap > 120 && r() < p.jump * 4) { inp.jump = true; move(dir); }
     // after a double jump: dive when the opponent sits roughly on the 45° line ahead
+    // (the cowboy lashes his whip down that line from where he hangs)
     const dx = (op.x - me.x) * me.facing, dy = op.y - me.y;
-    if (me.doubled && !me.attack && dx > 0 && Math.abs(dx - dy) < 70 && r() < p.attack) inp.attack = true;
+    if (me.doubled && me.stats.airLash && !me.lashed && !me.attack && dx > 0 && dx - dy > -10 && dx - dy < 55 && dx < myReach * AIR_LASH_REACH * 0.75 && r() < p.attack) inp.attack = true;
+    else if (me.doubled && !me.stats.airLash && !me.attack && dx > 0 && Math.abs(dx - dy) < 70 && r() < p.attack) inp.attack = true;
     else if (!me.onGround && !me.doubled && gap < myReach && r() < p.attack * 0.6) inp.attack = true;
     // drop down to chase an opponent on the ground
     if (me.platform >= 0 && op.y > me.y + 40 && r() < 0.5) inp.down = true;

@@ -2,13 +2,14 @@
 // Game rules stay in game.js; this module only reads the state and draws it,
 // adding engine-side effects (particles, Arcade-physics debris, camera FX, filters, sound).
 import * as Phaser from '../vendor/phaser-4.2.1.esm.min.js';
-import { VIEW_W, VIEW_H, WORLD_W, GROUND_Y, PARALLAX, MAX_ENERGY, SUPER_MAX, SUPER_HOLD, BODY_HALF_W, BODY_H, FLIP_TIME } from './config.js';
-import { frameName, turnScale } from './fighter.js';
+import { VIEW_W, VIEW_H, WORLD_W, GROUND_Y, PARALLAX, MAX_ENERGY, SUPER_MAX, SUPER_HOLD, BODY_HALF_W, BODY_H, FLIP_TIME, CHARGE_TIME, LONG_REACH_BONUS, AIR_LASH_REACH, REEL_DIST } from './config.js';
+import { frameName, turnScale, attackPhase, attackTiming, chargeLeft } from './fighter.js';
 import { loadImage, rasterize } from './assets.js';
 import { INTRO_TIME } from './game.js';
 
 export const SFX = ['swing', 'swingHeavy', 'hit', 'hitHeavy', 'guard', 'miss', 'jump', 'land', 'charge', 'super', 'quake', 'ko',
-  'round', 'fight', 'trade', 'trap', 'move', 'select', 'back', 'win', 'shout', 'boom', 'bow', 'whirl'];
+  'round', 'fight', 'trade', 'trap', 'move', 'select', 'back', 'win', 'shout', 'boom', 'bow', 'whirl',
+  'chargeUp', 'parry', 'gun', 'crack', 'chomp', 'snip', 'vs'];
 const STEP = 1 / 120;
 const MAX_TEX = 4096;
 const FONT = '"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif';
@@ -30,8 +31,12 @@ const MAP_FX = {
   ship:    { dust: 0xb08a5a, debris: 0x7a5230, trap: [0xffd23f, 0xff7a1a, 0xc2410c], ambient: 'embers' },
   library: { dust: 0xc8b08a, debris: 0x8a5a32, trap: [0xffe066, 0xffffff, 0xffd23f], ambient: null },
   rome:    { dust: 0xe0d0aa, debris: 0xc8b890, trap: [0xc8a46a, 0x8a6a3a, 0xffffff], ambient: null },
-  egypt:   { dust: 0xe8c482, debris: 0xc49a5a, trap: [0xe8c482, 0x8aa83a, 0xc49a5a], ambient: null }
+  egypt:   { dust: 0xe8c482, debris: 0xc49a5a, trap: [0xe8c482, 0x8aa83a, 0xc49a5a], ambient: null },
+  savanna: { dust: 0xc9a24e, debris: 0x8a6a30, trap: [0x9ac06a, 0x5a7a3a, 0xd8e8b0], ambient: 'leaves' },
+  market:  { dust: 0xa8a8ae, debris: 0x6a6a72, trap: [0x9fe0ff, 0x6ab8e0, 0xffffff], ambient: null },
+  moon:    { dust: 0xb8bcc4, debris: 0x8a8e96, trap: [0xd8ff6a, 0x7aff4a, 0x2aa02a], ambient: null }
 };
+const ADD_TRAPS = new Set(['seoul', 'lava', 'moon']);
 
 /* ---------- procedural textures ---------- */
 function rngLocal(seed) { return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
@@ -105,6 +110,16 @@ function makeFxTextures(scene) {
     // two side forks
     for (const k of [3, 6]) { const [x, y] = pts[Math.min(k, pts.length - 1)]; ctx.lineWidth = 2; ctx.strokeStyle = '#dff2ff'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (k % 2 ? 18 : -18), y + 26); ctx.lineTo(x + (k % 2 ? 12 : -24), y + 44); ctx.stroke(); }
   });
+  // orange-yellow fire tongue for the VS intro
+  canvasTexture(scene, 'fx-fire', 32, 64, ctx => {
+    const g = ctx.createRadialGradient(16, 46, 2, 16, 40, 30);
+    g.addColorStop(0, 'rgba(255,250,200,.95)'); g.addColorStop(0.35, 'rgba(255,190,60,.85)'); g.addColorStop(0.75, 'rgba(255,90,20,.5)'); g.addColorStop(1, 'rgba(200,30,0,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(16, 0); ctx.bezierCurveTo(30, 22, 32, 40, 28, 52); ctx.quadraticCurveTo(16, 66, 4, 52); ctx.bezierCurveTo(0, 40, 2, 22, 16, 0); ctx.fill();
+  });
+  canvasTexture(scene, 'fx-bullet', 14, 6, ctx => {
+    ctx.fillStyle = '#d4a017'; ctx.strokeStyle = '#3a2a10'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(1, 1); ctx.lineTo(8, 1); ctx.quadraticCurveTo(13, 3, 8, 5); ctx.lineTo(1, 5); ctx.closePath(); ctx.fill(); ctx.stroke();
+  });
   canvasTexture(scene, 'fx-leaf', 14, 8, ctx => {
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(7, 4, 6.5, 3, 0, 0, Math.PI * 2); ctx.fill();
   });
@@ -124,8 +139,8 @@ class FightScene extends Phaser.Scene {
   init(data) {
     Object.assign(this, { model: data.game, theme: data.theme, readInputs: data.readInputs, onLoaded: data.onLoaded });
     this.ready = false; this.acc = 0; this.slowT = 0; this.round = -1;
-    this.seen = new WeakSet(); this.texts = []; this.prev = [{}, {}]; this.trapT = [0, 0];
-    this.focus = 0; this.focusAt = null;
+    this.seen = new WeakSet(); this.texts = []; this.prev = [{}, {}]; this.trapT = [0, 0]; this.chargeUps = [];
+    this.focus = 0; this.focusAt = null; this.vsT = -1;
   }
 
   create() {
@@ -135,7 +150,7 @@ class FightScene extends Phaser.Scene {
     this.hudCam = this.cameras.add(0, 0, this.scale.width, this.scale.height).setOrigin(0, 0);
     this.fitCamera();
     this.scale.on('resize', this.fitCamera, this);
-    this.events.once('shutdown', () => { this.scale.off('resize', this.fitCamera, this); this.sound.stopByKey?.('charge'); });
+    this.events.once('shutdown', () => { this.scale.off('resize', this.fitCamera, this); this.sound.stopByKey?.('charge'); this.sound.stopByKey?.('chargeUp'); });
     this.physics.world.setBounds(0, -400, WORLD_W, VIEW_H + 800);
     this.prepare().then(() => { if (this.sys.isActive() || this.sys.isPaused()) { this.build(); this.ready = true; this.onLoaded?.(); } });
   }
@@ -168,11 +183,14 @@ class FightScene extends Phaser.Scene {
       return { key, k, tex: this.textures.get(key) };
     };
     const mapScale = clamp(px, 1, 3), charScale = clamp(px * 0.8, 1, 3);
-    const [far, ground, trap, plats, bull, ...chars] = await Promise.all([
+    const [far, ground, trap, plats, bull, por0, por1, ...chars] = await Promise.all([
       sheet(base + m.far, mapScale), sheet(base + m.ground, mapScale), sheet(base + m.trap.sheet, mapScale), sheet(base + m.platforms.sheet, mapScale),
       sheet(base + t.extras.bull.sheet, charScale),
+      // portraits for the VS intro (drawn ~110px tall on the 360px view)
+      ...this.model.settings.weapons.map(w => sheet(base + t.characters[w].portrait, clamp(px * 110 / 128, 1, 3))),
       ...this.model.settings.weapons.map(w => Promise.all(t.characters[w].sheets.map(p => sheet(base + p, charScale))))
     ]);
+    this.portraits = [por0, por1];
     const bc = t.extras.bull.cell;
     for (let fr = 0; fr < t.extras.bull.frames; fr++) if (!bull.tex.has(`b${fr}`)) bull.tex.add(`b${fr}`, 0, fr * bc[0] * bull.k, 0, bc[0] * bull.k, bc[1] * bull.k);
     const tw = m.trap.cell[0], th = m.trap.cell[1];
@@ -206,7 +224,9 @@ class FightScene extends Phaser.Scene {
     this.debris = this.physics.add.group({ bounceX: 0.3, bounceY: 0.42, dragX: 90, maxSize: 60 });
     this.physics.add.collider(this.debris, this.solids, (d) => { if (Math.abs(d.body.velocity.y) < 40) d.setAngularVelocity(d.body.angularVelocity * 0.6); });
 
-    this.arrows = []; this.bombs = [];
+    this.arrows = []; this.bombs = []; this.bullets = [];
+    // the cowboy's whip and lasso, drawn as live curves
+    this.lash = this.add.graphics().setDepth(12);
     this.whirl = this.add.graphics().setDepth(13);
     // electric sparks crackling around the thunder whirlwind
     this.zap = this.add.particles(0, 0, 'fx-dot', { emitting: false, lifespan: { min: 120, max: 260 }, speed: { min: 80, max: 260 }, scale: { start: 0.3, end: 0 },
@@ -219,10 +239,17 @@ class FightScene extends Phaser.Scene {
       const mk = () => this.add.sprite(0, 0, pages.pageOf.idle0, 'idle0').setOrigin(c.origin[0] / c.cell[0], c.origin[1] / c.cell[1]);
       const ghosts = [0, 1, 2].map(() => mk().setVisible(false).setDepth(9).setTint(0xffd27a).setTintMode(Phaser.TintModes.ADD));
       const aura = this.add.image(0, 0, 'fx-blueglow').setBlendMode(Phaser.BlendModes.ADD).setDepth(9).setVisible(false);
+      // charged attack: yellow energy gathers onto the fighter, arriving exactly when the charge completes
+      const gather = this.add.image(0, 0, 'fx-aura').setBlendMode(Phaser.BlendModes.ADD).setDepth(9).setVisible(false);
+      const charge = this.add.particles(0, 0, 'fx-dot', {
+        emitting: false, lifespan: 300, scale: { start: 0.4, end: 0.08 }, alpha: { start: 0.2, end: 1 }, blendMode: 'ADD', tint: [0xffe27a, 0xfff6c0, 0xffc83a],
+        emitZone: { type: 'edge', source: new Phaser.Geom.Circle(0, 0, 64), quantity: 28 },
+        emitCallback: p => { const L = Math.max(0.04, this.gatherLeft || 0.3); p.life = p.lifeCurrent = L * 1000; p.velocityX = -p.x / L; p.velocityY = -p.y / L; }
+      }).setDepth(11);
       const sprite = mk().setDepth(10);
       let glow = null;
       try { sprite.enableFilters(); glow = sprite.filters.internal.addGlow(0x5aaeff, 6, 0, 1, false, 10, 12); glow.active = false; } catch { glow = null; }
-      return { c, k: s.k, pageOf: pages.pageOf, sprite, ghosts, aura, glow };
+      return { c, k: s.k, pageOf: pages.pageOf, sprite, ghosts, aura, glow, gather, charge };
     });
 
     const P = (cfg) => this.add.particles(0, 0, cfg.texture || 'fx-dot', { emitting: false, ...cfg }).setDepth(cfg.depth ?? 20);
@@ -236,7 +263,7 @@ class FightScene extends Phaser.Scene {
         alpha: { start: 0.55, end: 0 }, tint: this.mapFx.dust, depth: 8 }),
       smoke: P({ texture: 'fx-puff', lifespan: { min: 400, max: 700 }, speed: { min: 30, max: 120 }, scale: { start: 0.5, end: 1.1 }, alpha: { start: 0.85, end: 0 }, tint: [0x2a2236, 0x4a3a5e], depth: 12 }),
       trap: P({ lifespan: { min: 300, max: 700 }, speedX: { min: -60, max: 60 }, speedY: { min: -320, max: -120 }, gravityY: 800, scale: { start: 0.35, end: 0.05 },
-        blendMode: this.model.mapId === 'seoul' || this.model.mapId === 'lava' ? 'ADD' : 'NORMAL', tint: this.mapFx.trap, bounce: 0.3, bounds: groundBounds,
+        blendMode: ADD_TRAPS.has(this.model.mapId) ? 'ADD' : 'NORMAL', tint: this.mapFx.trap, bounce: 0.3, bounds: groundBounds,
         collideTop: false, collideLeft: false, collideRight: false })
     };
     this.makeAmbient();
@@ -263,7 +290,60 @@ class FightScene extends Phaser.Scene {
     // super focus: the stage dims behind the fighters and cinema bars slide in
     this.dim = this.add.rectangle(-200, -400, WORLD_W + 400, VIEW_H + 800, 0x05030a).setOrigin(0).setDepth(8.9).setAlpha(0);
     this.bars = [0, 1].map(i => this.add.rectangle(0, i ? VIEW_H : 0, VIEW_W, 0, 0x000000).setOrigin(0, i).setScrollFactor(0).setDepth(950));
+    this.buildVs();
     this.fitCamera();
+  }
+
+  // Round intro: both portraits slide in and a burning, thunderstruck "VS" slams down between them.
+  buildVs() {
+    const H = (o, d) => o.setScrollFactor(0).setDepth(d).setVisible(false);
+    const g = this.add.graphics();
+    const port = this.portraits.map(p => H(this.add.image(0, 0, p.key).setScale(110 / 128 / p.k), 1003));
+    const fires = Array.from({ length: 10 }, () => H(this.add.image(0, 0, 'fx-fire').setOrigin(0.5, 1).setBlendMode(Phaser.BlendModes.ADD), 1004));
+    const bolts = Array.from({ length: 3 }, () => H(this.add.image(0, 0, 'fx-bolt').setOrigin(0.5, 0.5).setBlendMode(Phaser.BlendModes.ADD), 1004));
+    const T = (size, color, stroke, th) => { const t = H(this.add.text(0, 0, '', { fontFamily: FONT, fontSize: size, fontStyle: '900', color, stroke, strokeThickness: th }).setOrigin(0.5), 1005); this.texts.push(t); return t; };
+    const names = [0, 1].map(() => T('15px', '#ffffff', '#000', 4));
+    const vs = T('64px', '#ffe35a', '#7a1a00', 9);
+    vs.setText('VS');
+    try { vs.setShadow(0, 0, '#ff7a1a', 18, true, true); } catch { /* no shadow support */ }
+    this.vs = { g: H(g, 1002), port, fires, bolts, names, text: vs };
+  }
+
+  drawVs() {
+    const g = this.model, v = this.vs, t = g.phaseT;
+    const on = g.phase === 'intro' && t < INTRO_TIME * 0.65;
+    const all = [v.g, ...v.port, ...v.fires, ...v.bolts, ...v.names, v.text];
+    if (!on) { if (v.g.visible) all.forEach(o => o.setVisible(false)); return; }
+    all.forEach(o => o.setVisible(true));
+    const end = INTRO_TIME * 0.65, out = clamp((end - t) / 0.18, 0, 1);          // fade out before FIGHT!
+    const slide = ease(clamp(t / 0.25, 0, 1)), cy = VIEW_H * 0.57, cx = VIEW_W / 2;
+    const px = [cx - 165, cx + 165];
+    v.g.clear();
+    // a dark band behind everything, slanted red/blue halves
+    v.g.fillStyle(0x000000, 0.55 * out).fillRect(0, cy - 78, VIEW_W, 156);
+    v.g.fillStyle(0x2a5aff, 0.35 * out).fillPoints([{ x: 0, y: cy - 78 }, { x: cx + 30, y: cy - 78 }, { x: cx - 30, y: cy + 78 }, { x: 0, y: cy + 78 }], true);
+    v.g.fillStyle(0xff3a2a, 0.35 * out).fillPoints([{ x: cx + 30, y: cy - 78 }, { x: VIEW_W, y: cy - 78 }, { x: VIEW_W, y: cy + 78 }, { x: cx - 30, y: cy + 78 }], true);
+    g.fighters.forEach((f, i) => {
+      const x = px[i] + (i ? 1 : -1) * (1 - slide) * 260, ch = this.theme.characters[f.weapon];
+      const col = Phaser.Display.Color.HexStringToColor(ch.color).color;
+      v.g.lineStyle(4, col, out).strokeRect(x - 57, cy - 66, 114, 114);
+      v.g.lineStyle(1.5, 0xffffff, out).strokeRect(x - 60, cy - 69, 120, 120);
+      v.port[i].setPosition(x, cy - 9).setAlpha(out).setFlipX(i === 1);
+      v.names[i].setText(ch.name).setPosition(x, cy + 62).setAlpha(out);
+    });
+    // VS slams in (big → normal) at 0.2s, then trembles with fire and lightning
+    const k = clamp((t - 0.18) / 0.12, 0, 1), shake = k >= 1 ? (Math.random() - 0.5) * 3 : 0;
+    v.text.setScale(k > 0 ? 2.6 - 1.6 * ease(k) : 0.01).setAlpha(k * out).setPosition(cx + shake, cy + shake);
+    v.fires.forEach((fi, n) => {
+      const a = n / v.fires.length * Math.PI * 2 + t * 3, r = 34 + 6 * Math.sin(t * 20 + n);
+      fi.setPosition(cx + Math.cos(a) * r * 1.2, cy + 26 + Math.sin(a) * r * 0.35).setScale(0.8 + Math.random() * 0.5, 1 + Math.random() * 0.9).setAlpha(k * out * (0.6 + Math.random() * 0.4));
+    });
+    v.bolts.forEach((b, n) => {
+      const flick = k > 0 && Math.random() < 0.45;
+      b.setPosition(cx + (n - 1) * 46 + (Math.random() - 0.5) * 20, cy - 4).setRotation((n - 1) * 0.5 + (Math.random() - 0.5) * 0.4)
+        .setScale(0.5 + Math.random() * 0.2, 0.55).setAlpha(flick ? out : 0);
+    });
+    if (k > 0 && this.vsT !== g.round) { this.vsT = g.round; this.sfx('vs', { volume: 0.7 }); this.cameras.main.shake(160, 0.008); }
   }
 
   makeAmbient() {
@@ -350,11 +430,11 @@ class FightScene extends Phaser.Scene {
         cam.shake(70, 0.003);
         this.sfx('guard', { volume: 0.7 });
       } else if (e.type === 'armor') {
-        // heavy-attack armor: damage lands, the fighter doesn't budge
+        // heavy-attack armor: damage lands, the fighter doesn't budge (the sword's hold takes none)
         this.fx.spark.explode(8, e.x, e.y);
-        this.ring(e.x, e.y, 0xffa040, 1.2);
-        this.popText(`-${e.dmg}`, e.x, e.y - 18, '#ffb347', 16);
-        this.popText('버팀!', e.x, e.y - 44, '#ffd27a', 13);
+        this.ring(e.x, e.y, e.dmg ? 0xffa040 : 0xffffff, 1.2);
+        if (e.dmg) this.popText(`-${e.dmg}`, e.x, e.y - 18, '#ffb347', 16);
+        this.popText(e.dmg ? '버팀!' : '무적 버팀!', e.x, e.y - 44, '#ffd27a', 13);
         cam.shake(90, 0.004);
         this.sfx('guard', { volume: 0.6, rate: 0.7 });
       } else if (e.type === 'miss') {
@@ -370,6 +450,42 @@ class FightScene extends Phaser.Scene {
         cam.shake(160, 0.009);
         this.sfx('hitHeavy', { volume: 0.7, rate: 1.2 });
         this.sfx('guard', { volume: 0.6, rate: 0.6 });
+      } else if (e.type === 'parry') {
+        // perfect parry: a bright flash, a golden double ring, the attacker locks up
+        this.flashStar(e.x, e.y, 1.6, 0xffffff);
+        this.flashStar(e.x, e.y, 1.1, 0xffe35a);
+        this.ring(e.x, e.y, 0xffe35a, 1.4); this.time.delayedCall(70, () => this.ring(e.x, e.y, 0xffffff, 2.2));
+        this.fx.guard.explode(22, e.x, e.y);
+        this.popText('패링!', e.x, e.y - 30, '#fff36a', 22);
+        cam.flash(90, 255, 250, 210);
+        cam.shake(90, 0.004);
+        this.sfx('parry', { volume: 0.85 });
+      } else if (e.type === 'muzzle') {
+        this.flashStar(e.x, e.y, 0.6, 0xffd27a);
+        this.fx.smoke.explode(4, e.x + e.dir * 6, e.y);
+        this.fx.spark.explode(6, e.x, e.y);
+        cam.shake(80, 0.004);
+        this.sfx('gun', { volume: 0.8 });
+      } else if (e.type === 'bulletDrop') {
+        this.fx.dust.explode(3, e.x, e.y);
+      } else if (e.type === 'lasso') {
+        this.ring(e.x, e.y, 0xc9a46a, 1.4);
+        this.popText('올가미!', e.x, e.y - 40, '#ffd27a', 18);
+        this.sfx('crack', { volume: 0.8, rate: 0.8 });
+      } else if (e.type === 'lassoMiss') {
+        this.sfx('crack', { volume: 0.5, rate: 0.7 });
+      } else if (e.type === 'reel') {
+        this.fx.dust.explode(6, e.x, e.y);
+        this.sfx('crack', { volume: 0.6, rate: 1.2 });
+      } else if (e.type === 'bite' || e.type === 'pinch') {
+        // the crocodile lunges out of the swamp / the snow crab climbs out of the tank
+        const t = g.layout.traps.find(tr => e.x > tr.x && e.x < tr.x + tr.w), tx = t ? t.x + t.w / 2 : e.x;
+        const bite = e.type === 'bite';
+        this.fx.trap.explode(14, tx, GROUND_Y - 6);
+        this.flashStar(e.x, GROUND_Y - 30, 0.7, bite ? 0xffffff : 0xffb07a);
+        this.popText(bite ? '콱!' : '집게 꼬집!', tx, GROUND_Y - (bite ? 80 : 160), bite ? '#c8ff8a' : '#ff8a5a', 18);
+        cam.shake(140, 0.005);
+        this.sfx(bite ? 'chomp' : 'snip', { volume: 0.85 });
       } else if (e.type === 'scold') {
         // the library guard yells; sound rings burst from his spot
         const t = g.layout.traps.find(tr => e.x > tr.x && e.x < tr.x + tr.w), gx = t ? t.x + t.w / 2 : e.x;
@@ -427,10 +543,13 @@ class FightScene extends Phaser.Scene {
 
     g.fighters.forEach((f, i) => {
       const p = this.prev[i];
-      if (f.attack && f.attack !== p.attack) this.sfx(f.stats.power >= 18 ? 'swingHeavy' : 'swing', { volume: 0.55, rate: rnd(0.92, 1.08) });
+      if (f.attack && f.attack !== p.attack && !(f.attack.kind === 'charged' && (f.stats.gun || f.stats.bow))) {
+        if (f.weapon === 'whip') this.time.delayedCall(Math.max(0, attackTiming(f).startup / (f.attack.speed ?? 1)) * 1000, () => this.sfx('crack', { volume: 0.6, rate: rnd(0.95, 1.1) }));
+        else this.sfx(f.stats.power >= 18 ? 'swingHeavy' : 'swing', { volume: 0.55, rate: rnd(0.92, 1.08) });
+      }
       if (p.onGround && !f.onGround && f.vy < 0) { this.fx.dust.explode(5, f.x, f.y); this.sfx('jump', { volume: 0.4 }); }
       if (f.doubled && !p.doubled) { this.ring(f.x, f.y, 0xffffff, 0.8); this.sfx('jump', { volume: 0.4, rate: 1.3 }); }
-      if ((f.attack?.kind === 'dive' || f.attack?.kind === 'plunge') && f.attack.landed !== undefined && p.diveLanded === undefined && p.attack === f.attack) {
+      if (f.attack?.kind === 'dive' && f.attack.landed !== undefined && p.diveLanded === undefined && p.attack === f.attack) {
         this.fx.dust.explode(14, f.x, f.y);
         this.spawnDebris(f.x + f.facing * 10, f.y - 4, 4, f.facing);
         this.cameras.main.shake(120, 0.006);
@@ -443,6 +562,20 @@ class FightScene extends Phaser.Scene {
       }
       if (f.charge > 0 && !(p.charge > 0)) this.chargeSound = this.sound.add('charge'), this.game.sound.locked || this.chargeSound.play({ volume: 0.5 });
       if (!(f.charge > 0) && p.charge > 0) { this.chargeSound?.stop(); this.chargeSound?.destroy(); this.chargeSound = null; }
+      // charged attack: the old rising charge hum, squeezed to end exactly as the charge completes
+      const charging = f.attack?.kind === 'charged' && attackPhase(f) === 'startup';
+      if (charging && !p.charging) {
+        this.stopChargeUp(i);
+        const total = attackTiming(f).startup / (f.attack.speed ?? 1);
+        if (!this.game.sound.locked) { const snd = this.sound.add('chargeUp'); snd.play({ volume: 0.55, rate: CHARGE_TIME / total }); this.chargeUps[i] = snd; }
+      }
+      if (!charging && p.charging) {
+        if (f.attack?.kind === 'charged') {
+          // charge complete: a burst of light as the gathered energy is released
+          const h = height(f);
+          this.ring(f.x, f.y - h / 2, 0xffe27a, 1.5); this.flashStar(f.x, f.y - h / 2, 0.8, 0xfff3b0);
+        } else this.stopChargeUp(i);   // let go early
+      }
       if (f.ko && !p.ko) {
         this.slowT = 0.9;
         this.cameras.main.flash(260, 255, 255, 255);
@@ -464,7 +597,7 @@ class FightScene extends Phaser.Scene {
 
       // super dash: dust trail from the feet
       if (f.super && f.onGround && Math.abs(f.vx) > 150 && Math.random() < 0.5) this.fx.dust.explode(2, f.x - f.facing * 10, f.y);
-      Object.assign(p, { fired: f.attack?.fired, spin: !!f.super?.def.spin, airDash: f.airDash, attack: f.attack, onGround: f.onGround, vy: f.vy, charge: f.charge, ko: f.ko, doubled: f.doubled, diveLanded: f.attack?.landed });
+      Object.assign(p, { charging, fired: f.attack?.fired, spin: !!f.super?.def.spin, airDash: f.airDash, attack: f.attack, onGround: f.onGround, vy: f.vy, charge: f.charge, ko: f.ko, doubled: f.doubled, diveLanded: f.attack?.landed });
     });
 
     if (g.phase !== this.lastPhase) {
@@ -473,6 +606,12 @@ class FightScene extends Phaser.Scene {
       if (g.phase === 'matchEnd') this.sfx('win', { volume: 0.6 });
       this.lastPhase = g.phase;
     }
+  }
+
+  stopChargeUp(i) {
+    this.chargeUps ??= [];
+    const s = this.chargeUps[i];
+    if (s) { s.stop(); s.destroy(); this.chargeUps[i] = null; }
   }
 
   spawnDebris(x, y, n, dir = 0) {
@@ -543,6 +682,7 @@ class FightScene extends Phaser.Scene {
       } else v.sprite.setOrigin(ox, oy).setPosition(f.x, f.y).setRotation(0);
       // hit flash: solid white for a moment, then blink
       if (f.hitFlash > 0.14) v.sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL).setAlpha(1);
+      else if (f.frozen > 0) v.sprite.setTint(0x8fb8ff).setTintMode(Phaser.TintModes.MULTIPLY).setAlpha(1);   // parried: locked up
       else {
         v.sprite.clearTint?.(); v.sprite.setTintMode(Phaser.TintModes.MULTIPLY);
         v.sprite.setAlpha(f.hitFlash > 0 && Math.floor(f.hitFlash * 30) % 2 ? 0.45 : f.inTrap && Math.floor(g.t * 12) % 2 ? 0.6 : 1);
@@ -562,8 +702,19 @@ class FightScene extends Phaser.Scene {
         v.aura.setVisible(true).setPosition(f.x, f.y - height(f) * 0.45).setScale(height(f) * (0.8 + 0.8 * fire) / 128).setAlpha(0.2 + 0.3 * fire);
         if (Math.random() < 0.2 + 0.45 * fire) this.flame(f, fire);
       } else v.aura.setVisible(false);
+      // charged attack: yellow energy converging on the body; the particles' flight time is the time
+      // the charge still needs, so they all arrive as it completes
+      const left = f.attack?.kind === 'charged' && attackPhase(f) === 'startup' ? chargeLeft(f) : 0;
+      if (left > 0) {
+        const total = attackTiming(f).startup / (f.attack.speed ?? 1), u = 1 - left / total, h = height(f);
+        v.gather.setVisible(true).setPosition(f.x, f.y - h / 2).setScale(h * (0.7 + 0.9 * u) / 128).setAlpha(0.25 + 0.6 * u);
+        v.charge.setPosition(f.x, f.y - h / 2);
+        this.gatherLeft = left;
+        if (left > 0.03) v.charge.emitParticle(2);
+      } else v.gather.setVisible(false);
     });
     this.syncProjectiles(g);
+    this.drawLash(g);
     this.drawWhirl(g);
     const bull = g.bull, bs = this.bullSprite, bx = this.theme.extras.bull;
     bs.setVisible(!!bull);
@@ -577,6 +728,15 @@ class FightScene extends Phaser.Scene {
 
   syncProjectiles(g) {
     const arrows = g.projectiles.filter(p => p.type === 'arrow'), bombs = g.projectiles.filter(p => p.type === 'bomb');
+    const bullets = g.projectiles.filter(p => p.type === 'bullet');
+    while (this.bullets.length < bullets.length) this.bullets.push(this.add.image(0, 0, 'fx-bullet').setDepth(14));
+    this.bullets.forEach((img, k) => {
+      const p = bullets[k];
+      img.setVisible(!!p);
+      if (!p) return;
+      img.setPosition(p.x, p.y).setFlipX(p.dir < 0).setRotation(p.dropping ? p.dir * Math.min(1.2, p.vy / 900) : 0);
+      if (!p.dropping) this.fx.spark.emitParticle(1, p.x - p.dir * 8, p.y);
+    });
     while (this.arrows.length < arrows.length) this.arrows.push(this.add.image(0, 0, 'fx-arrow').setDepth(14));
     while (this.bombs.length < bombs.length) this.bombs.push(this.add.image(0, 0, 'fx-bomb').setDepth(14).setScale(0.8));
     this.arrows.forEach((img, k) => {
@@ -615,6 +775,73 @@ class FightScene extends Phaser.Scene {
     this.tweens.add({ targets: b, alpha: { from: 1, to: 0 }, duration: 260, ease: 'Stepped', easeParams: [4], onComplete: () => b.destroy() });
     this.zap.explode(10, x, y - 4);
     this.fx.dust.explode(4, x, y);
+  }
+
+  // The cowboy's bullwhip: a live curve from the hand. It arcs back over the head while winding up,
+  // cracks out to its full reach while active and reels back in during recovery. The lasso and the
+  // reel-back line use the same rope.
+  drawLash(g) {
+    const L = this.lash;
+    L.clear();
+    for (const f of g.fighters) {
+      if (f.weapon !== 'whip' || f.ko) continue;
+      const h = height(f), hx = f.x + f.facing * (halfW(f) + 4), hy = f.y - h * 0.62;
+      const rope = (pts, w = 1) => {
+        for (const [wd, col] of [[3.6 * w, 0x18131f], [1.8 * w, 0x8a5a2e]]) {
+          L.lineStyle(wd, col, 1).beginPath(); L.moveTo(pts[0][0], pts[0][1]);
+          for (const [x, y] of pts.slice(1)) L.lineTo(x, y);
+          L.strokePath();
+        }
+      };
+      const curve = (x0, y0, x1, y1, bend, n = 14) => Array.from({ length: n + 1 }, (_, i) => {
+        const u = i / n, mx = (x0 + x1) / 2, my = (y0 + y1) / 2 - bend;
+        return [(1 - u) * (1 - u) * x0 + 2 * u * (1 - u) * mx + u * u * x1, (1 - u) * (1 - u) * y0 + 2 * u * (1 - u) * my + u * u * y1];
+      });
+      if (f.reel) {
+        // hooked into the ground behind and reeling in
+        const hook = f.reel.from + f.reel.dir * (REEL_DIST * h + 24);
+        rope(curve(f.x + f.reel.dir * 6, hy, hook, f.y, -6));
+        L.fillStyle(0x8a9098).fillCircle(hook, f.y - 2, 3);
+        continue;
+      }
+      const sp = f.super;
+      if (sp?.def.lasso) {
+        const op = g.fighters.find(o => o !== f), las = sp.def.lasso, t = sp.t;
+        if (sp.caught) {
+          const lashing = sp.def.hits.some(hh => t >= hh.at - 0.04 && t < hh.at + hh.len);
+          if (t < las.at + las.pull + 0.1) rope(curve(hx, hy, op.x, op.y - height(op) * 0.55, 10));
+          else if (lashing) rope(curve(hx, hy, op.x + (Math.random() - 0.5) * 20, op.y - height(op) * (0.3 + Math.random() * 0.5), 30 + Math.random() * 40));
+          else rope(curve(hx, hy, hx - f.facing * 30, hy - 50, 20));
+        } else if (t >= las.at - 0.1 && t < las.at + 0.3) {
+          // thrown loop sails out to the lasso radius and comes back empty
+          const u = clamp((t - las.at + 0.1) / 0.4, 0, 1), d = las.radius * Math.sin(Math.PI * u);
+          const tx = hx + f.facing * d, ty = hy - 30 * Math.sin(Math.PI * u);
+          rope(curve(hx, hy, tx, ty, 24));
+          L.lineStyle(2.4, 0x8a5a2e).strokeEllipse(tx, ty, 26, 12);
+        } else if (t < las.at) rope(curve(hx, hy, hx - f.facing * 20, hy - 60, 0));
+        continue;
+      }
+      const a = f.attack;
+      if (!a || a.kind === 'charged') continue;
+      const ph = attackPhase(f), T = attackTiming(f);
+      const reach = a.kind === 'long' ? f.stats.reach + LONG_REACH_BONUS : a.kind === 'airLash' ? f.stats.reach * AIR_LASH_REACH : f.stats.reach;
+      const front = f.x + f.facing * halfW(f);
+      let tx = front + f.facing * reach, ty = a.aerial && a.kind !== 'airLash' ? f.y - h * 0.3 : hy + 6;
+      if (a.kind === 'airLash') { const d = reach * Math.SQRT1_2; tx = front + f.facing * d; ty = hy + d; }
+      if (ph === 'startup') {
+        // swung back over the head
+        const u = a.t / T.startup;
+        if (u < 0.35) continue;
+        rope(curve(hx, hy - 6, hx - f.facing * 50 * u, hy - 50 * u, -10));
+      } else if (ph === 'active') {
+        const u = (a.t - T.startup) / T.active, wave = Math.sin(u * Math.PI * 3) * 6 * (1 - u);
+        rope(curve(hx, hy, tx, ty, 8 + wave));
+        if (u < 0.3) this.flashStar(tx, ty, 0.35, 0xffffff);
+      } else {
+        const u = clamp((a.t - T.startup - T.active) / T.recovery, 0, 1), k = 1 - ease(u);
+        if (k > 0.05) rope(curve(hx, hy, hx + (tx - hx) * k, hy + (ty - hy) * k + 18 * (1 - k), -6 * k));
+      }
+    }
   }
 
   drawWhirl(g) {
@@ -704,16 +931,19 @@ class FightScene extends Phaser.Scene {
     const tl = Math.ceil(g.timeLeft);
     this.timer.setText(String(tl)).setColor(tl <= 10 ? '#ff6b5a' : '#ffffff').setPosition(cx, top - 4);
 
-    // round banners
+    // round banners (while ROUND n shows, the VS intro sits under it)
     let text = '', sub = '';
     const ph = g.phase, t = g.phaseT, names = g.fighters.map(f => this.theme.characters[f.weapon].name);
-    if (ph === 'intro') text = t < INTRO_TIME * 0.65 ? `ROUND ${g.round}` : 'FIGHT!';
+    const vsOn = ph === 'intro' && t < INTRO_TIME * 0.65;
+    this.banner.y = vsOn ? VIEW_H * 0.57 - 100 : VIEW_H * 0.42;
+    this.drawVs();
+    if (ph === 'intro') text = vsOn ? `ROUND ${g.round}` : 'FIGHT!';
     else if (ph === 'roundEnd' && g.result) {
       text = g.result.reason === 'KO' ? 'K.O.' : 'TIME UP';
       if (t > 0.8) sub = g.result.winner < 0 ? '무승부' : `${names[g.result.winner]} 승리`;
     } else if (ph === 'matchEnd' && t < 1.5) { text = 'WINNER'; sub = names[g.winner]; }
     const pop = 0.6 + 0.4 * Math.min(1, t * 6);
-    this.banner.setText(text).setScale(pop);
+    this.banner.setText(text).setScale(pop * (vsOn ? 0.68 : 1));
     this.bannerSub.setText(sub);
 
     // super name slides in from the user's side

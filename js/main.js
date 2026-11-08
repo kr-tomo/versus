@@ -100,16 +100,34 @@ function moveListTarget(src) {
 }
 
 function toggleMoveList(src) {
-  if (moveLists.has(src)) { moveLists.get(src).remove(); moveLists.delete(src); stage.play('back'); return; }
-  const { side, w } = moveListTarget(src), c = theme.characters[w], ml = moveList(w);
+  if (moveLists.has(src)) { closeMoveList(src); return; }
+  const { side, w } = moveListTarget(src);
+  openMoveList(src, side, w);
+}
+
+function closeMoveList(key) {
+  moveLists.get(key)?.remove(); moveLists.delete(key); stage.play('back');
+}
+
+// key: the pad index that opened it, or 'touch<player>' when a finger (or mouse) did.
+function openMoveList(key, side, w) {
+  const c = theme.characters[w], ml = moveList(w), touch = typeof key === 'string';
   for (const [k, el] of moveLists) if (el.parentElement === side) { el.remove(); moveLists.delete(k); }
   const el = document.createElement('div');
   el.className = 'movelist';
-  el.innerHTML = `<header><img src="${theme.base + c.portrait}" alt=""><div><b>${c.name}</b><small>${c.title} · ${ml.name}</small></div></header>
+  el.innerHTML = `<header><img src="${theme.base + c.portrait}" alt=""><div><b>${c.name}</b><small>${c.title} · ${ml.name}</small></div>
+    <button class="ml-close" aria-label="닫기">✕</button></header>
     <div class="ml-body"><table>${ml.rows.map(r => `<tr><th>${r.kind}</th><td><b>${r.name}</b>${r.note ? `<small>${r.note}</small>` : ''}</td><td class="in">${r.input}</td></tr>`).join('')}</table></div>
-    <footer>▲▼ 스크롤 · Ⓑ 닫기</footer>`;
+    <footer>${touch ? '밀어서 스크롤 · ✕ 닫기' : '▲▼ 스크롤 · Ⓑ 닫기'}</footer>`;
+  el.querySelector('.ml-close').onclick = e => { e.stopPropagation(); closeMoveList(key); };
+  // finger/mouse drag scrolls the list (the page itself blocks touch panning)
+  const body = el.querySelector('.ml-body');
+  let drag = null;
+  body.addEventListener('pointerdown', e => { drag = { y: e.clientY, top: body.scrollTop, id: e.pointerId }; body.classList.add('dragging'); body.setPointerCapture?.(e.pointerId); });
+  body.addEventListener('pointermove', e => { if (drag && e.pointerId === drag.id) body.scrollTop = drag.top - (e.clientY - drag.y); });
+  for (const ev of ['pointerup', 'pointercancel']) body.addEventListener(ev, () => { drag = null; body.classList.remove('dragging'); });
   side.appendChild(el);
-  moveLists.set(src, el);
+  moveLists.set(key, el);
   stage.play('select');
 }
 
@@ -192,7 +210,11 @@ function buildSetup() {
       `<button class="portrait" data-w="${w}" style="--c:${theme.characters[w].color}"><img src="${theme.base + theme.characters[w].portrait}" alt=""><span>${WEAPONS[w].name}</span></button>`).join('');
     side.querySelector('.roster').onclick = e => {
       const b = e.target.closest('[data-w]');
-      if (b) { settings.weapons[p] = b.dataset.w; refreshSetup(); }
+      if (!b) return;
+      // touching (or clicking) the character that is already picked opens its move list;
+      // pad/keyboard Ⓐ clicks come in with detail 0 and only pick
+      if (e.detail > 0 && settings.weapons[p] === b.dataset.w) { openMoveList(`touch${p}`, side, b.dataset.w); return; }
+      settings.weapons[p] = b.dataset.w; refreshSetup();
     };
   }
   for (const r of document.querySelectorAll('#setup .roster')) r.style.setProperty('--cols', Math.ceil(WEAPON_IDS.length / 2));
@@ -277,10 +299,18 @@ function safeInsets() {
   return ['Top', 'Right', 'Bottom', 'Left'].map(k => parseFloat(cs[`padding${k}`]) || 0);
 }
 
+// Players that need on-screen buttons: those not on a gamepad (the computer never needs them).
+function touchPlayers() {
+  const pads = new Set(input.padPlayers());
+  return Array.from({ length: input.players }, (_, i) => i).filter(i => !pads.has(i));
+}
+
 function onResize() {
   const [it, ir, ib, il] = safeInsets();
   const W = innerWidth - il - ir, H = innerHeight - it - ib;
-  const layout = computeLayout(W, H, { players: input.players });
+  const touch = touchPlayers();
+  layoutKey = `${W}x${H}:${input.players}:${touch}`;
+  const layout = computeLayout(W, H, { players: input.players, touch });
   const v = layout.view, dpr = Math.min(devicePixelRatio || 1, 3);
   Object.assign(stageEl.style, { left: `${il + v.x}px`, top: `${it + v.y}px`, width: `${v.w}px`, height: `${v.h}px` });
   try { stage.resize(Math.round(v.w * dpr), Math.round(v.h * dpr)); } catch (e) { report('resize', e); }
@@ -290,13 +320,18 @@ function onResize() {
   const ps = Math.round(Math.max(30, v.h * 0.085)), gap = Math.round(ps * 0.2), top = it + v.y + v.h * (46 / 360);
   Object.assign(pauseBtn.style, { left: `${il + v.x + v.w / 2 - ps - gap / 2}px`, top: `${top}px`, width: `${ps}px`, height: `${ps}px`, fontSize: `${ps * 0.42}px` });
   Object.assign(exitBtn.style, { left: `${il + v.x + v.w / 2 + gap / 2}px`, top: `${top}px`, width: `${ps}px`, height: `${ps}px`, fontSize: `${ps * 0.42}px` });
-  updatePadUI();
+  // fingers resting on buttons that just went away must not stay pressed
+  input.pointers.clear();
+  updateHints();
 }
 
+// A gamepad connected or left: the touch buttons of a pad player disappear (or come back) and the
+// main view grows into (or gives back) the space.
+let layoutKey = '';
 function updatePadUI() {
-  const pads = new Set(input.padPlayers());
-  for (const el of controls.querySelectorAll('.pad')) el.classList.toggle('off', pads.has(+el.dataset.player));
-  updateHints();
+  const [it, ir, ib, il] = safeInsets();
+  if (layoutKey !== `${innerWidth - il - ir}x${innerHeight - it - ib}:${input.players}:${touchPlayers()}`) onResize();
+  else updateHints();
 }
 
 /* ---------- loop: pads for the menus, match end ---------- */

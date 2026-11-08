@@ -14,8 +14,7 @@ const never = () => 0.99;
 const step = (f, input = NO_INPUT, n = 1, world = W) => { for (let i = 0; i < n; i++) stepFighter(f, input, DT, world); };
 const firstStrike = (f, input = NO_INPUT) => { for (let i = 0; i < 200 && !strike(f); i++) step(f, input); return strike(f); };
 
-test('charge: half as long (0.25s) and a steady pose — no flicker', () => {
-  assert.equal(CHARGE_TIME, 0.25);
+test('charge: a steady pose — no flicker', () => {
   const f = createFighter('sword', 400, 1), frames = [];
   for (let i = 0; i < 160; i++) { step(f, { ...NO_INPUT, attack: true }); if (f.attack?.kind === 'charged' && f.attack.t < CHARGE_TIME) frames.push(frameName(f)); }
   assert.ok(frames.length > 0);
@@ -78,28 +77,6 @@ test('dagger: double-tap forward and hold teleports three body heights ahead', (
   assert.ok(s.x - 300 < 100);
 });
 
-test('sword: from higher than 1.8x body height an air attack plunges straight down for 1.8x damage', () => {
-  const world = { platforms: [], ice: false };
-  const f = createFighter('sword', 400, 1);
-  f.y = GROUND_Y - BODY_H * 2; f.onGround = false; f.vy = 0;
-  step(f, { ...NO_INPUT, attack: true }, 1, world);
-  assert.equal(f.attack.kind, 'plunge');
-  step(f, NO_INPUT, 8, world);
-  assert.equal(f.vx, 0); assert.ok(f.vy > 600, 'straight down');
-  const s = strike(f), hb = hitbox(f, s);
-  assert.equal(s.dmg, Math.round(WEAPONS.sword.power * 1.8));
-  assert.ok(hb.y2 > f.y, 'strikes below the body');
-  for (let i = 0; i < 120 && !f.onGround; i++) step(f, NO_INPUT, 1, world);
-  assert.equal(f.onGround, true);
-  assert.ok(f.attack, 'held after landing');
-  step(f, NO_INPUT, Math.ceil(0.1 / DT) + 1, world);
-  assert.equal(f.attack, null, 'released after 0.1s');
-  // a normal jump stays below the threshold → regular air attack
-  const g = createFighter('sword', 400, 1);
-  step(g, { ...NO_INPUT, jump: true }, 1, world); step(g, NO_INPUT, 20, world); step(g, { ...NO_INPUT, attack: true }, 1, world);
-  assert.equal(g.attack.kind, 'aerial');
-});
-
 test('spear: jump and forward attacks reach 1.3x; back-step reach equals the normal one', () => {
   const fwd = createFighter('spear', 400, 1); step(fwd, { ...NO_INPUT, right: true, attack: true });
   assert.ok(Math.abs(firstStrike(fwd, { ...NO_INPUT, right: true }).reach - (WEAPONS.spear.reach + LONG_REACH_BONUS) * 1.3) < 1e-9);
@@ -117,7 +94,7 @@ test('archer super is named 비격진천뢰; every character has a move list wit
     assert.equal(ml.rows.at(-1).name, SUPERS[w].name);
   }
   assert.ok(moveList('dagger').rows.some(r => r.name === '그림자 걸음'));
-  assert.ok(moveList('sword').rows.some(r => r.name === '수직 내려찍기'));
+  assert.ok(!moveList('sword').rows.some(r => r.name === '수직 내려찍기'));
   assert.ok(moveList('tkd').rows.some(r => r.kind === '2단 공격' && r.name === '날라차기'));
   assert.ok(moveList('tkd').rows.some(r => r.kind === '버티기 공격'));
   assert.ok(!moveList('fist').rows.some(r => r.kind === '버티기 공격'));

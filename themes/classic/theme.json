@@ -68,7 +68,7 @@
         "bowShot": 40,
         "backTurn": 41,
         "backKick": 42,
-        "plunge": 43,
+        "airLash": 43,
         "idle0>idle01": 44,
         "idle01>idle1": 45,
         "idle1>idle10": 46,
@@ -119,8 +119,8 @@
         "backTurn>backKick": 91,
         "backKick>backTurn": 92,
         "backTurn>idle0": 93,
-        "jump>plunge": 94,
-        "plunge>hit0": 95
+        "jump>airLash": 94,
+        "airLash>fall": 95
       }
     },
     "spear": {
@@ -189,7 +189,7 @@
         "bowShot": 40,
         "backTurn": 41,
         "backKick": 42,
-        "plunge": 43,
+        "airLash": 43,
         "idle0>idle01": 44,
         "idle01>idle1": 45,
         "idle1>idle10": 46,
@@ -240,8 +240,8 @@
         "backTurn>backKick": 91,
         "backKick>backTurn": 92,
         "backTurn>idle0": 93,
-        "jump>plunge": 94,
-        "plunge>hit0": 95
+        "jump>airLash": 94,
+        "airLash>fall": 95
       }
     },
     "axe": {
@@ -310,7 +310,7 @@
         "bowShot": 40,
         "backTurn": 41,
         "backKick": 42,
-        "plunge": 43,
+        "airLash": 43,
         "idle0>idle01": 44,
         "idle01>idle1": 45,
         "idle1>idle10": 46,
@@ -361,8 +361,8 @@
         "backTurn>backKick": 91,
         "backKick>backTurn": 92,
         "backTurn>idle0": 93,
-        "jump>plunge": 94,
-        "plunge>hit0": 95
+        "jump>airLash": 94,
+        "airLash>fall": 95
       }
     },
     "dagger": {
@@ -431,7 +431,7 @@
         "bowShot": 40,
         "backTurn": 41,
         "backKick": 42,
-        "plunge": 43,
+        "airLash": 43,
         "idle0>idle01": 44,
         "idle01>idle1": 45,
         "idle1>idle10": 46,
@@ -482,8 +482,8 @@
         "backTurn>backKick": 91,
         "backKick>backTurn": 92,
         "backTurn>idle0": 93,
-        "jump>plunge": 94,
-        "plunge>hit0": 95
+        "jump>airLash": 94,
+        "airLash>fall": 95
       }
     },
     "fist": {
@@ -552,7 +552,7 @@
         "bowShot": 40,
         "backTurn": 41,
         "backKick": 42,
-        "plunge": 43,
+        "airLash": 43,
         "idle0>idle01": 44,
         "idle01>idle1": 45,
         "idle1>idle10": 46,
@@ -603,8 +603,8 @@
         "backTurn>backKick": 91,
         "backKick>backTurn": 92,
         "backTurn>idle0": 93,
-        "jump>plunge": 94,
-        "plunge>hit0": 95
+        "jump>airLash": 94,
+        "airLash>fall": 95
       }
     },
     "stag": {
@@ -673,7 +673,7 @@
         "bowShot": 40,
         "backTurn": 41,
         "backKick": 42,
-        "plunge": 43,
+        "airLash": 43,
         "idle0>idle01": 44,
         "idle01>idle1": 45,
         "idle1>idle10": 46,
@@ -724,8 +724,8 @@
         "backTurn>backKick": 91,
         "backKick>backTurn": 92,
         "backTurn>idle0": 93,
-        "jump>plunge": 94,
-        "plunge>hit0": 95
+        "jump>airLash": 94,
+        "airLash>fall": 95
       }
     },
     "genghis": {
@@ -794,7 +794,7 @@
         "bowShot": 40,
         "backTurn": 41,
         "backKick": 42,
-        "plunge": 43,
+        "airLash": 43,
         "idle0>idle01": 44,
         "idle01>idle1": 45,
         "idle1>idle10": 46,
@@ -845,8 +845,8 @@
         "backTurn>backKick": 91,
         "backKick>backTurn": 92,
         "backTurn>idle0": 93,
-        "jump>plunge": 94,
-        "plunge>hit0": 95
+        "jump>airLash": 94,
+        "airLash>fall": 95
       }
     },
     "mace": {
@@ -915,7 +915,7 @@
         "bowShot": 40,
         "backTurn": 41,
         "backKick": 42,
-        "plunge": 43,
+        "airLash": 43,
         "idle0>idle01": 44,
         "idle01>idle1": 45,
         "idle1>idle10": 46,
@@ -966,8 +966,8 @@
         "backTurn>backKick": 91,
         "backKick>backTurn": 92,
         "backTurn>idle0": 93,
-        "jump>plunge": 94,
-        "plunge>hit0": 95
+        "jump>airLash": 94,
+        "airLash>fall": 95
       }
     },
     "fork": {
@@ -1036,7 +1036,7 @@
         "bowShot": 40,
         "backTurn": 41,
         "backKick": 42,
-        "plunge": 43,
+        "airLash": 43,
         "idle0>idle01": 44,
         "idle01>idle1": 45,
         "idle1>idle10": 46,
@@ -1087,8 +1087,8 @@
         "backTurn>backKick": 91,
         "backKick>backTurn": 92,
         "backTurn>idle0": 93,
-        "jump>plunge": 94,
-        "plunge>hit0": 95
+        "jump>airLash": 94,
+        "airLash>fall": 95
       }
     },
     "tkd": {
@@ -1157,7 +1157,7 @@
         "bowShot": 40,
         "backTurn": 41,
         "backKick": 42,
-        "plunge": 43,
+        "airLash": 43,
         "idle0>idle01": 44,
         "idle01>idle1": 45,
         "idle1>idle10": 46,
@@ -1208,8 +1208,8 @@
         "backTurn>backKick": 91,
         "backKick>backTurn": 92,
         "backTurn>idle0": 93,
-        "jump>plunge": 94,
-        "plunge>hit0": 95
+        "jump>airLash": 94,
+        "airLash>fall": 95
       }
     },
     "archer": {
@@ -1278,7 +1278,7 @@
         "bowShot": 40,
         "backTurn": 41,
         "backKick": 42,
-        "plunge": 43,
+        "airLash": 43,
         "idle0>idle01": 44,
         "idle01>idle1": 45,
         "idle1>idle10": 46,
@@ -1329,8 +1329,129 @@
         "backTurn>backKick": 91,
         "backKick>backTurn": 92,
         "backTurn>idle0": 93,
-        "jump>plunge": 94,
-        "plunge>hit0": 95
+        "jump>airLash": 94,
+        "airLash>fall": 95
+      }
+    },
+    "whip": {
+      "name": "와이엇",
+      "en": "Wyatt",
+      "title": "미국 서부시대 카우보이",
+      "color": "#b5651d",
+      "sheets": [
+        "characters/whip-0.svg",
+        "characters/whip-1.svg",
+        "characters/whip-2.svg"
+      ],
+      "perPage": 36,
+      "portrait": "portraits/whip.svg",
+      "cell": [
+        220,
+        190
+      ],
+      "origin": [
+        70,
+        180
+      ],
+      "cols": 6,
+      "scale": 0.8,
+      "frames": {
+        "idle0": 0,
+        "idle01": 1,
+        "idle1": 2,
+        "idle10": 3,
+        "walk0": 4,
+        "walk01": 5,
+        "walk1": 6,
+        "walk12": 7,
+        "walk2": 8,
+        "walk23": 9,
+        "walk3": 10,
+        "walk30": 11,
+        "windup0": 12,
+        "windup": 13,
+        "attack": 14,
+        "attack1": 15,
+        "guard0": 16,
+        "guard": 17,
+        "airGuard": 18,
+        "jump": 19,
+        "apex": 20,
+        "fall": 21,
+        "jumpAtk0": 22,
+        "jumpAtk": 23,
+        "hit": 24,
+        "hit0": 25,
+        "win": 26,
+        "win0": 27,
+        "longWind": 28,
+        "longAtk0": 29,
+        "longAtk": 30,
+        "heavyWind": 31,
+        "heavyAtk0": 32,
+        "heavyAtk": 33,
+        "flip": 34,
+        "dive": 35,
+        "chargeHold": 36,
+        "airDash": 37,
+        "chargeAtk": 38,
+        "bowDraw": 39,
+        "bowShot": 40,
+        "backTurn": 41,
+        "backKick": 42,
+        "airLash": 43,
+        "idle0>idle01": 44,
+        "idle01>idle1": 45,
+        "idle1>idle10": 46,
+        "idle10>idle0": 47,
+        "walk0>walk01": 48,
+        "walk01>walk1": 49,
+        "walk1>walk12": 50,
+        "walk12>walk2": 51,
+        "walk2>walk23": 52,
+        "walk23>walk3": 53,
+        "walk3>walk30": 54,
+        "walk30>walk0": 55,
+        "idle0>windup0": 56,
+        "windup0>windup": 57,
+        "windup>attack": 58,
+        "attack>attack1": 59,
+        "attack1>idle0": 60,
+        "idle0>guard0": 61,
+        "guard0>guard": 62,
+        "fall>airGuard": 63,
+        "jump>apex": 64,
+        "apex>fall": 65,
+        "jump>jumpAtk0": 66,
+        "jumpAtk0>jumpAtk": 67,
+        "hit>hit0": 68,
+        "hit0>idle0": 69,
+        "win>win0": 70,
+        "win0>win": 71,
+        "idle0>longWind": 72,
+        "longWind>longAtk0": 73,
+        "longAtk0>longAtk": 74,
+        "longAtk>attack1": 75,
+        "idle0>heavyWind": 76,
+        "heavyWind>heavyAtk0": 77,
+        "heavyAtk0>heavyAtk": 78,
+        "heavyAtk>attack1": 79,
+        "jump>flip": 80,
+        "flip>dive": 81,
+        "dive>hit0": 82,
+        "jump>airDash": 83,
+        "idle0>chargeHold": 84,
+        "chargeHold>chargeAtk": 85,
+        "chargeAtk>attack1": 86,
+        "idle0>bowDraw": 87,
+        "bowDraw>bowShot": 88,
+        "bowShot>idle0": 89,
+        "chargeHold>backTurn": 90,
+        "backTurn>backKick": 91,
+        "backKick>backTurn": 92,
+        "backTurn>idle0": 93,
+        "jump>airLash": 94,
+        "airLash>fall": 95
       }
     }
   },
@@ -1601,6 +1722,108 @@
       },
       "extras": {
         "posts": "#c9a46a"
+      }
+    },
+    "savanna": {
+      "far": "maps/savanna/far.svg",
+      "ground": "maps/savanna/ground.svg",
+      "trap": {
+        "sheet": "maps/savanna/trap.svg",
+        "cell": [
+          130,
+          114
+        ],
+        "origin": [
+          20,
+          70
+        ],
+        "frames": 2,
+        "width": 90
+      },
+      "platforms": {
+        "sheet": "maps/savanna/platforms.svg",
+        "cellH": 48,
+        "origin": [
+          4,
+          4
+        ],
+        "widths": [
+          120,
+          150,
+          180,
+          210
+        ]
+      },
+      "extras": {
+        "posts": "#6a4a2a"
+      }
+    },
+    "market": {
+      "far": "maps/market/far.svg",
+      "ground": "maps/market/ground.svg",
+      "trap": {
+        "sheet": "maps/market/trap.svg",
+        "cell": [
+          120,
+          184
+        ],
+        "origin": [
+          20,
+          140
+        ],
+        "frames": 2,
+        "width": 80
+      },
+      "platforms": {
+        "sheet": "maps/market/platforms.svg",
+        "cellH": 48,
+        "origin": [
+          4,
+          4
+        ],
+        "widths": [
+          120,
+          150,
+          180,
+          210
+        ]
+      },
+      "extras": {
+        "posts": "#6a4a2a"
+      }
+    },
+    "moon": {
+      "far": "maps/moon/far.svg",
+      "ground": "maps/moon/ground.svg",
+      "trap": {
+        "sheet": "maps/moon/trap.svg",
+        "cell": [
+          130,
+          114
+        ],
+        "origin": [
+          20,
+          70
+        ],
+        "frames": 2,
+        "width": 90
+      },
+      "platforms": {
+        "sheet": "maps/moon/platforms.svg",
+        "cellH": 48,
+        "origin": [
+          4,
+          4
+        ],
+        "widths": [
+          120,
+          150,
+          180,
+          210
+        ]
+      },
+      "extras": {
+        "posts": "#8a949e"
       }
     }
   },

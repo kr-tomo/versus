@@ -32,14 +32,16 @@ test('judge: a hit lands after the confirm window, with a hitstop', () => {
   assert.ok(g.hitstop > 0);
 });
 
-test('judge: pressing guard during the confirm window still guards (late guard)', () => {
+test('judge: a guard still coming up when the hit is confirmed counts (late guard)', () => {
+  // v11: a fresh press inside the last 0.1s is a parry, so the late guard is a press from before that
+  // which the axe's slow guard (0.15s) hasn't finished raising
   const g = setup('sword', 'axe'), [a, b] = g.fighters;
-  g.update(DT, [{ ...NO_INPUT, attack: true }, NO_INPUT]);
-  while (!g.pending.length) g.update(DT, [NO_INPUT, NO_INPUT]);
-  // guard pressed right after contact — the axe's guard would never be up in time on its own
-  run(g, HIT_CONFIRM + 0.05, () => NO_INPUT, () => ({ ...NO_INPUT, guard: true }));
+  g.update(DT, [{ ...NO_INPUT, attack: true }, NO_INPUT]);   // sword: contact at 0.15s, confirmed at 0.20s
+  run(g, 0.08 - DT);
+  run(g, 0.3, () => NO_INPUT, () => ({ ...NO_INPUT, guard: true }));   // pressed 0.12s before the confirm
   assert.equal(b.energy, MAX_ENERGY - 1);
   assert.ok(g.effects.some(e => e.type === 'guard'));
+  assert.ok(!g.effects.some(e => e.type === 'parry'));
 });
 
 test('judge: guard after the window is too late', () => {

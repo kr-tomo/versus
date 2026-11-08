@@ -60,6 +60,13 @@ const WEAPONS = {
     <ellipse cx="4.5" cy="0" rx="2" ry="6" fill="#d4a017" stroke="${OL}" stroke-width="1.4"/>
     <path d="M6 -2.2 Q30 -4 54 -1 L58 1.5 L54 2.6 Q30 1 6 2.2 Z" fill="#e3e8ee" stroke="${OL}" stroke-width="2" stroke-linejoin="round"/>
     <path d="M8 -0.4 Q30 -1.6 52 0.4" stroke="#a9b3bf" stroke-width="1" fill="none"/>`,
+  // bullwhip: braided leather handle with the lash coiled at the hand (the stage draws it uncoiled)
+  whip: () => `
+    <rect x="-6" y="-2.6" width="20" height="5.2" rx="2" fill="#5a3418" stroke="${OL}" stroke-width="1.6"/>
+    <path d="M-3 -2.6 l3 5.2 M3 -2.6 l3 5.2 M9 -2.6 l3 5.2" stroke="#8a5a2e" stroke-width="1.1"/>
+    <circle cx="-7" cy="0" r="2.4" fill="#c9a04a" stroke="${OL}" stroke-width="1.2"/>
+    <path d="M14 0 Q22 2 22 9 Q20 18 10 18 Q2 16 4 9 Q8 2 16 6 Q20 10 14 14" fill="none" stroke="${OL}" stroke-width="4.2" stroke-linecap="round"/>
+    <path d="M14 0 Q22 2 22 9 Q20 18 10 18 Q2 16 4 9 Q8 2 16 6 Q20 10 14 14" fill="none" stroke="#7a4a22" stroke-width="2.2" stroke-linecap="round"/>`,
   mace: () => `
     <line x1="-12" y1="0" x2="44" y2="0" stroke="${OL}" stroke-width="7" stroke-linecap="round"/>
     <line x1="-12" y1="0" x2="44" y2="0" stroke="#4a4f57" stroke-width="4" stroke-linecap="round"/>
@@ -101,6 +108,16 @@ const BOW = drawn => `
          <path d="M-28 0 l-5 -4 M-28 0 l-5 4 M-24 0 l-5 -4 M-24 0 l-5 4" stroke="#d0262e" stroke-width="1.6"/>`
       : `<line x1="1" y1="-35" x2="1" y2="35" stroke="#efe6cf" stroke-width="1.3"/>`}`;
 
+// Single-action revolver, held level in the front hand; cocked = hammer back before the shot.
+const REVOLVER = cocked => `
+    <path d="M-2 -2 L-8 10 Q-9 13 -5 13 L0 13 L3 3 Z" fill="#6b3a1e" stroke="${OL}" stroke-width="1.6" stroke-linejoin="round"/>
+    <rect x="-3" y="-5" width="13" height="7" rx="1.5" fill="#5e636b" stroke="${OL}" stroke-width="1.6"/>
+    <rect x="9" y="-4.5" width="20" height="4" rx="1" fill="#8a9098" stroke="${OL}" stroke-width="1.5"/>
+    <rect x="1" y="-6" width="8" height="8" rx="2" fill="#4a4f57" stroke="${OL}" stroke-width="1.4"/>
+    <path d="M27 -5.5 v-2" stroke="${OL}" stroke-width="1.5"/>
+    <path d="M-3 -4 ${cocked ? 'L-8 -10' : 'L-5 -8'}" stroke="${OL}" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M2 2 Q3 7 6 6" stroke="${OL}" stroke-width="1.3" fill="none"/>`;
+
 /* ---------- poses ---------- */
 export const POSES = {
   idle0:   { lean: 6,  tilt: 0,   fTh: 28, fSh: -2,  bTh: -22, bSh: -14, fUp: 30,  fFo: 105, bUp: 10,  bFo: 95,  w: -55,  wB: -40 },
@@ -135,8 +152,8 @@ const DERIVED = {
   chargeAtk: { from: ['heavyAtk', 'heavyAtk', 0] },
   backTurn:  { from: ['chargeHold', 'chargeHold', 0] },
   backKick:  { from: ['chargeAtk', 'chargeAtk', 0] },
-  // straight-down air strike: knees tucked, both hands driving the weapon point at the ground
-  plunge:    { from: ['jumpAtk', 'jumpAtk', 0], set: { lean: 4, tilt: 6, fTh: 75, fSh: -15, bTh: 40, bSh: -60, fUp: 25, fFo: 5, bUp: 30, bFo: 10, w: 90, wB: 90 } },
+  // hanging in the air, the weapon arm thrown 45° down-forward (the cowboy's whip lash)
+  airLash:   { from: ['jumpAtk', 'jumpAtk', 0], set: { lean: 12, tilt: 6, fTh: 72, fSh: -12, bTh: 26, bSh: -56, fUp: 62, fFo: 48, bUp: -40, bFo: 10, w: 45, wB: 40 } },
   // bow frames (only the archer swaps in the bow; the rest render them like an extended guard)
   bowDraw:   { from: ['idle0', 'idle0', 0], add: { lean: -3 }, set: { fUp: 90, fFo: 92, bUp: 72, bFo: -48, w: 0, wB: 0, fTh: 34, fSh: 0, bTh: -24, bSh: -14 } },
   bowShot:   { from: ['idle0', 'idle0', 0], add: { lean: -1 }, set: { fUp: 90, fFo: 92, bUp: 35, bFo: -95, w: 0, wB: 0, fTh: 34, fSh: 0, bTh: -24, bSh: -14 } }
@@ -155,7 +172,7 @@ const BASE_FRAMES = [
   ['longWind'], ['longAtk0', 'longWind', 'longAtk', 0.5], ['longAtk'],
   ['heavyWind'], ['heavyAtk0', 'heavyWind', 'heavyAtk', 0.5], ['heavyAtk'],
   ['flip'], ['dive'], ['chargeHold'], ['airDash'], ['chargeAtk'], ['bowDraw'], ['bowShot'],
-  ['backTurn'], ['backKick'], ['plunge']
+  ['backTurn'], ['backKick'], ['airLash']
 ];
 export const MOTION_CHAINS = [
   ['idle0', 'idle01', 'idle1', 'idle10', 'idle0'],
@@ -170,7 +187,7 @@ export const MOTION_CHAINS = [
   ['idle0', 'chargeHold', 'chargeAtk', 'attack1'],
   ['idle0', 'bowDraw', 'bowShot', 'idle0'],
   ['chargeHold', 'backTurn', 'backKick'], ['backKick', 'backTurn', 'idle0'],
-  ['jump', 'plunge', 'hit0']
+  ['jump', 'airLash', 'fall']
 ];
 const FRAME_DEFS = [...BASE_FRAMES];
 for (const chain of MOTION_CHAINS) for (let i = 0; i < chain.length - 1; i++) {
@@ -204,7 +221,7 @@ const HORSE_POSES = {
 const HORSE_FOR = {
   idle0: 'stand', idle1: 'stand', guard: 'stand', airGuard: 'tuck', jump: 'tuck', fall: 'tuck', jumpAtk: 'tuck', win: 'rear',
   longWind: 'windup', longAtk: 'attack', heavyWind: 'rear', heavyAtk: 'attack', flip: 'tuck', dive: 'tuck', chargeHold: 'windup',
-  airDash: 'tuck', chargeAtk: 'attack', bowDraw: 'stand', bowShot: 'stand', backTurn: 'windup', backKick: 'attack', plunge: 'tuck'
+  airDash: 'tuck', chargeAtk: 'attack', bowDraw: 'stand', bowShot: 'stand', backTurn: 'windup', backKick: 'attack', airLash: 'tuck'
 };
 const horseKey = name => HORSE_POSES[HORSE_FOR[name] || name] || HORSE_POSES.stand;
 // in-between frames blend the horse legs of their two source frames
@@ -514,6 +531,37 @@ export const CHARS = [
       <ellipse cx="1" cy="-23" rx="18" ry="2.4" fill="#2c3d7a"/>
       <path d="M-9 -34 Q-24 -46 -34 -36 Q-26 -40 -22 -34 Q-30 -36 -34 -28 Q-22 -30 -12 -30 Z" fill="#d0262e" stroke="${OL}" stroke-width="1.5" stroke-linejoin="round"/>
       <path d="M-10 -36 Q-20 -54 -14 -66" stroke="#4a8a5a" stroke-width="2" fill="none"/><ellipse cx="-14" cy="-66" rx="3" ry="4.5" fill="#3a6fb0" stroke="${OL}" stroke-width="1"/>`
+  },
+  {
+    id: 'whip', name: '와이엇', en: 'Wyatt', weaponName: '채찍·권총', origin: '미국 서부시대 카우보이',
+    accent: '#b5651d', skin: '#e9b98f', body: '#e8dcc0', sleeve: '#e8dcc0', fore: '#e9b98f', pants: '#3a5a8a', shin: '#5a3418', gun: true,
+    poses: {
+      idle0: { w: 60, fUp: 20, fFo: 70 }, windup: { fUp: 165, fFo: 200, w: -120, lean: -6 },
+      attack: { fUp: 100, fFo: 92, w: 10, lean: 16 }, guard: { w: -60, fUp: 30, fFo: 150 }, airGuard: { w: -60, fUp: 30, fFo: 150 },
+      jumpAtk: { w: 30, fUp: 110, fFo: 80 }, win: { w: -110, fUp: 175, fFo: 178, bUp: 20, bFo: 60 },
+      // revolver: front arm level, rear hand at the belt; the shot kicks the muzzle up
+      bowDraw: { fUp: 88, fFo: 90, w: 0, bUp: 15, bFo: 40, lean: 2 },
+      bowShot: { fUp: 104, fFo: 116, w: -26, bUp: 15, bFo: 40, lean: -4 }
+    },
+    // coiled lasso on the back hip
+    back: () => `<ellipse cx="-12" cy="-6" rx="7" ry="9" fill="none" stroke="${OL}" stroke-width="4"/><ellipse cx="-12" cy="-6" rx="7" ry="9" fill="none" stroke="#c9a46a" stroke-width="2"/>
+      <ellipse cx="-12" cy="-6" rx="4.5" ry="6" fill="none" stroke="#c9a46a" stroke-width="1.6"/>`,
+    torso: (c, gunOut) => `<path d="M-11 0 L11 0 L13 10 L-13 10 Z" fill="${c.pants}" stroke="${OL}" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M-10 1 L10 1 L12 -27 Q0 -33 -12 -27 Z" fill="${c.body}" stroke="${OL}" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M-11 -26 L-3 -27 L-1 0 L-11 0 Z M11 -26 L4 -27 L3 0 L11 0 Z" fill="#7a4a22" stroke="${OL}" stroke-width="1.8" stroke-linejoin="round"/>
+      <path d="M-7 -14 l2 0 M-7 -8 l2 0" stroke="#d4a017" stroke-width="1.6"/>
+      <path d="M6 -24 l-3 5 l2 2 l3 -5 l-1 -1 Z" fill="#d4a017" stroke="${OL}" stroke-width=".9"/>
+      <path d="M-6 -30 L1 -22 L8 -30 L4 -27 L1 -28 L-2 -27 Z" fill="#c23b2b" stroke="${OL}" stroke-width="1.5" stroke-linejoin="round"/>
+      <rect x="-12" y="-5" width="24" height="4.5" fill="#3a2414" stroke="${OL}" stroke-width="1"/><rect x="-1.5" y="-6" width="7" height="6.5" rx="1" fill="#d4a017" stroke="${OL}" stroke-width="1"/>
+      <path d="M4 -1 L9 14 L14 12 L10 -1 Z" fill="#5a3418" stroke="${OL}" stroke-width="1.6" stroke-linejoin="round"/>
+      ${gunOut ? '' : `<path d="M7 -3 L10 -8 L15 -6 L12 0 Z" fill="#6b3a1e" stroke="${OL}" stroke-width="1.3"/>`}`,
+    headFront: c => `<path d="M3 -5 Q9 -9 15 -5 Q12 -3 9 -4 Q6 -3 3 -5 Z" fill="#5a3418" stroke="${OL}" stroke-width="1.2"/>
+      <path d="M2 -1 Q10 6 17 -2" stroke="#8a5a2e" stroke-width="1.4" fill="none" opacity=".6"/>
+      <path d="M6 -16 L13 -15" stroke="${OL}" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M-26 -23 Q-24 -18 -14 -21 Q1 -25 16 -21 Q26 -18 29 -24 Q30 -18 18 -15 Q1 -11 -16 -15 Q-27 -18 -26 -23 Z" fill="#8a5a2e" stroke="${OL}" stroke-width="2.2" stroke-linejoin="round"/>
+      <path d="M-12 -21 Q-13 -36 -5 -38 Q1 -33 7 -38 Q15 -36 14 -21 Z" fill="#9a6a38" stroke="${OL}" stroke-width="2.4" stroke-linejoin="round"/>
+      <path d="M-12 -24 Q1 -27 14 -24" stroke="#3a2414" stroke-width="3" fill="none"/>
+      <path d="M-8 -34 Q-6 -36 -4 -35" stroke="#c09060" stroke-width="1.6" fill="none"/>`
   }
 ];
 
@@ -584,17 +632,20 @@ export function renderChar(c, poseName, opts = {}) {
   };
   const arm = (sh, el, h, d) => ln(sh, el, 12, OL) + ln(el, h, 11, OL) + ln(sh, el, 8, d ? dk(c.sleeve) : c.sleeve) + ln(el, h, 7, d ? dk(c.fore) : c.fore);
   const hand = (h, d) => `<circle cx="${f(h[0])}" cy="${f(h[1])}" r="${handR}" fill="${d ? dk(fistWrap) : fistWrap}" stroke="${OL}" stroke-width="2"/>`;
+  const shotFrame = poseName === 'bowDraw' || poseName === 'bowShot' || poseName === 'idle0>bowDraw' || poseName === 'bowDraw>bowShot' || poseName === 'bowShot>idle0';
   const bowFrame = c.bow && (poseName === 'bowDraw' || poseName === 'bowShot');
-  const weapon = (h, ang) => `<g transform="translate(${f(h[0])} ${f(h[1])}) rotate(${ang})">${bowFrame ? BOW(poseName === 'bowDraw') : WEAPONS[c.id]()}</g>`;
+  // the cowboy draws his revolver for the whole shot (the whip hangs at his belt meanwhile)
+  const gunFrame = c.gun && shotFrame;
+  const weapon = (h, ang) => `<g transform="translate(${f(h[0])} ${f(h[1])}) rotate(${ang})">${bowFrame ? BOW(poseName === 'bowDraw') : gunFrame ? REVOLVER(poseName !== 'bowShot' && poseName !== 'bowShot>idle0') : WEAPONS[c.id]()}</g>`;
 
   let s = '';
-  if (c.back) s += `<g transform="rotate(${p.lean})">${c.back(c, poseName)}</g>`;
+  if (c.back) s += `<g transform="rotate(${p.lean})">${c.back(c, poseName, gunFrame)}</g>`;
   if (c.cape) s += `<g transform="rotate(${p.lean})"><path d="M-8 -28 Q-22 -8 -24 16 L-14 18 L-4 8 Z" fill="${c.cape}" stroke="${OL}" stroke-width="2.5" stroke-linejoin="round"/></g>`;
   s += arm(shB, elB, hB, true);
   if (c.dual) s += weapon(hB, p.wB);
   s += hand(hB, true);
   s += leg(hipB, kB, aB, true) + leg(hipF, kF, aF, false);
-  s += `<g transform="rotate(${p.lean})">${c.torso(c)}</g>`;
+  s += `<g transform="rotate(${p.lean})">${c.torso(c, gunFrame)}</g>`;
   s += `<g transform="translate(${f(neck[0])} ${f(neck[1])}) rotate(${p.lean + p.tilt})">
       ${c.headBack ? c.headBack(c) : ''}
       <line x1="0" y1="2" x2="1" y2="-8" stroke="${OL}" stroke-width="11"/><line x1="0" y1="2" x2="1" y2="-8" stroke="${c.skin}" stroke-width="7"/>

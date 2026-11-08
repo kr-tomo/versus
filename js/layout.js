@@ -84,9 +84,19 @@ function bottomLayout(W, H, players, m0) {
   return { mode: 'bottom', view, btn: m.btn, buttons };
 }
 
-export function computeLayout(W, H, { players = 2 } = {}) {
+// touch: the players that actually need touch buttons (default: all). A player on a gamepad or the
+// computer gets none; with nobody left on touch the view takes the whole screen.
+export function computeLayout(W, H, { players = 2, touch = Array.from({ length: players }, (_, i) => i) } = {}) {
+  if (!touch.length) {
+    const vw = Math.min(W, H * ASPECT), vh = vw / ASPECT;
+    return { mode: 'none', view: { x: (W - vw) / 2, y: (H - vh) / 2, w: vw, h: vh }, btn: 0, buttons: [] };
+  }
+  const n = touch.length >= 2 ? 2 : 1;
   const m = metrics(W, H);
-  const side = sideLayout(W, H, players, m);
-  const bottom = bottomLayout(W, H, players, m);
-  return side && side.view.w >= bottom.view.w * SIDE_MIN_RATIO ? side : bottom;
+  const side = sideLayout(W, H, n, m);
+  const bottom = bottomLayout(W, H, n, m);
+  const L = side && side.view.w >= bottom.view.w * SIDE_MIN_RATIO ? side : bottom;
+  // a single cluster belongs to whichever player is left on touch
+  if (n === 1) L.buttons.forEach(b => { b.player = touch[0]; });
+  return L;
 }

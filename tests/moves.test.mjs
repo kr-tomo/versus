@@ -83,13 +83,13 @@ test('heavy attack: armor takes damage without knockback or interruption', () =>
   assert.equal(plain.attack, null);
 });
 
-test('double jump: only fighters with reach at most half the longest', () => {
+test('double jump: only fighters with reach at most half the longest (plus the cowboy)', () => {
   for (const w of WEAPON_IDS) {
     const f = createFighter(w, 400, 1);
     step(f, { ...NO_INPUT, jump: true }); step(f, NO_INPUT, 20);
     const vy = f.vy;
     step(f, { ...NO_INPUT, jump: true });
-    const flips = WEAPONS[w].reach <= MAX_REACH / 2;
+    const flips = WEAPONS[w].reach <= MAX_REACH / 2 || !!WEAPONS[w].doubleJump;   // the cowboy too
     assert.equal(f.doubled, flips || !!WEAPONS[w].airDash, w);   // the stag's second jump is a level dash
     assert.equal(f.vy < -500 && vy > -500, flips, w);
   }
