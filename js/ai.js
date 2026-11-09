@@ -3,11 +3,14 @@ import { attackPhase, attackTiming } from './fighter.js';
 
 // guard: chance to notice an incoming attack; guardLag: extra delay before raising the guard
 // (added to the weapon's own guardUp), so even hard misses blocks sometimes.
+// backoff: about every BACKOFF_EVERY seconds, the chance to back away and open up some distance.
 const LEVELS = {
-  easy: { react: 0.45, guard: 0.25, guardLag: 0.12, attack: 0.5, avoidTrap: 0.5, spacing: false, punish: false, jump: 0.04, superUse: 0.15, parry: 0.02, reel: 0.1 },
-  hard: { react: 0.14, guard: 0.5, guardLag: 0.08, attack: 0.9, avoidTrap: 1, spacing: true, punish: true, jump: 0.08, superUse: 0.6, parry: 0.06, reel: 0.3 }
+  easy: { backoff: 0.7, react: 0.45, guard: 0.25, guardLag: 0.12, attack: 0.5, avoidTrap: 0.5, spacing: false, punish: false, jump: 0.04, superUse: 0.15, parry: 0.02, reel: 0.1 },
+  hard: { backoff: 0.3, react: 0.14, guard: 0.5, guardLag: 0.08, attack: 0.9, avoidTrap: 1, spacing: true, punish: true, jump: 0.08, superUse: 0.6, parry: 0.06, reel: 0.3 }
 };
 const halfW = f => f.stats.halfW ?? BODY_HALF_W;
+const BACKOFF_EVERY = [16, 24];   // seconds between rolls ("about every 20s")
+const BACKOFF_TIME = [1.2, 2.0];  // how long it keeps backing away
 
 // Computer player. Decides every `react` seconds and holds that input in between.
 export class AI {
@@ -16,10 +19,20 @@ export class AI {
     this.rand = rand;
     this.cool = 0;
     this.input = { left: false, right: false, jump: false, down: false, attack: false, guard: false };
+    this.backoffClock = this.span(BACKOFF_EVERY);
+    this.retreat = 0;
   }
+
+  span([a, b]) { return a + this.rand() * (b - a); }
 
   update(dt, me, op, game) {
     this.cool -= dt;
+    // now and then, back away for a moment (easy does it more often than hard)
+    this.retreat = Math.max(0, this.retreat - dt);
+    if ((this.backoffClock -= dt) <= 0) {
+      this.backoffClock = this.span(BACKOFF_EVERY);
+      if (this.rand() < this.p.backoff) this.retreat = this.span(BACKOFF_TIME);
+    }
     // release one-shot buttons so they register as fresh presses next time
     this.input.jump = false;
     // holding attack + guard to fire the super
@@ -56,6 +69,15 @@ export class AI {
 
     // standing in a trap: get out
     if (me.inTrap) { move(dir); inp.jump = me.onGround; return; }
+
+    // backing off: walk away (hopping over a trap behind), still guarding against a swing
+    if (this.retreat > 0 && !me.super) {
+      move(-dir);
+      const behind = me.x - dir * 40;
+      if (me.onGround && game.layout.traps.some(t => behind > t.x && behind < t.x + t.w)) inp.jump = true;
+      if ((attackPhase(op) === 'startup' || attackPhase(op) === 'active') && gap < opReach + 20 && r() < p.guard) inp.guard = true;
+      return;
+    }
 
     // threatened by an incoming attack (or a super, which can't be interrupted)
     const threat = op.super || op.charge > 0 || ((opPhase === 'startup' || opPhase === 'active') && gap < opReach + 20);
@@ -99,6 +121,13 @@ export class AI {
     if (me.stats.reel && me.onGround && !me.attack && me.reelCD <= 0 && gap < 30 && r() < p.reel) {
       const back = dir > 0 ? { left: true } : { right: true };
       this.seq = [[0.04, back], [0.04, {}], [0.16, back]];
+      return;
+    }
+
+    // Genghis far away: double-tap forward and hold to charge in on horseback
+    if (me.stats.rush && me.onGround && !me.attack && !me.rush && me.rushCD <= 0 && gap > 180 && r() < p.reel) {
+      const fwd = dir > 0 ? { right: true } : { left: true };
+      this.seq = [[0.04, fwd], [0.04, {}], [0.16, fwd]];
       return;
     }
 

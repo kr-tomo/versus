@@ -52,10 +52,10 @@ const savanna = {
   trap(w, fr) {
     return `<defs><linearGradient id="svSwamp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a7a3a"/><stop offset="1" stop-color="#2a3a1a"/></linearGradient></defs>
       <rect x="0" y="0" width="${w}" height="44" fill="url(#svSwamp)"/>
-      <path d="M0 3 Q${w * .25} ${fr ? -2 : 5} ${w * .5} 3 T${w} 3" stroke="#9ac06a" stroke-width="2" fill="none"/>
+      <path d="M0 3 Q${w * .25} ${f(5 - fr * 7)} ${w * .5} 3 T${w} 3" stroke="#9ac06a" stroke-width="2" fill="none"/>
       ${[0.15, 0.85].map(k => `<path d="M${f(w * k)} 2 l-4 -18 M${f(w * k + 3)} 2 l2 -22 M${f(w * k + 6)} 2 l5 -16" stroke="#5a7a2a" stroke-width="2"/><ellipse cx="${f(w * k + 3)}" cy="-20" rx="2" ry="5" fill="#6a4a2a"/>`).join('')}
-      <g transform="translate(${w / 2 - 14} 0)">${crocodile(fr)}</g>
-      ${fr ? `<circle cx="${f(w * .2)}" cy="-8" r="3" fill="#bfe0a0" opacity=".8"/><circle cx="${f(w * .8)}" cy="-14" r="2.4" fill="#bfe0a0" opacity=".8"/>` : ''}
+      <g transform="translate(${w / 2 - 14} 0)"><g opacity="${f(1 - fr)}">${crocodile(0)}</g><g opacity="${f(fr)}" transform="translate(0 ${f((1 - fr) * 16)})">${crocodile(1)}</g></g>
+      <g opacity="${f(fr * 0.8)}"><circle cx="${f(w * .2)}" cy="${f(-2 - fr * 6)}" r="3" fill="#bfe0a0"/><circle cx="${f(w * .8)}" cy="${f(-4 - fr * 10)}" r="2.4" fill="#bfe0a0"/></g>
       <path d="M-4 0 L2 44 M${w + 4} 0 L${w - 2} 44" stroke="#6a4a2a" stroke-width="6"/>`;
   },
   platform(w) {
@@ -195,15 +195,18 @@ const moon = {
     return s;
   },
   trap(w, fr) {
-    return `<defs><radialGradient id="mnRad${fr}"><stop offset="0" stop-color="#d8ff6a" stop-opacity="${fr ? 1 : 0.8}"/><stop offset=".6" stop-color="#5aff3a" stop-opacity="${fr ? 0.7 : 0.45}"/><stop offset="1" stop-color="#2aa02a" stop-opacity="0"/></radialGradient></defs>
-      <ellipse cx="${w / 2}" cy="-4" rx="${w / 2 + (fr ? 18 : 10)}" ry="${fr ? 40 : 30}" fill="url(#mnRad${fr})"/>
+    // the radioactive glow pulses smoothly with the phase
+    const id = `mnRad${Math.round(fr * 1000)}`, L = (a, b) => f(a + (b - a) * fr);
+    return `<defs><radialGradient id="${id}"><stop offset="0" stop-color="#d8ff6a" stop-opacity="${L(0.8, 1)}"/><stop offset=".6" stop-color="#5aff3a" stop-opacity="${L(0.45, 0.7)}"/><stop offset="1" stop-color="#2aa02a" stop-opacity="0"/></radialGradient></defs>
+      <ellipse cx="${w / 2}" cy="-4" rx="${L(w / 2 + 10, w / 2 + 18)}" ry="${L(30, 40)}" fill="url(#${id})"/>
       <rect x="0" y="0" width="${w}" height="44" fill="#2a3a1e"/>
-      <path d="M4 4 Q${w * .3} ${fr ? 10 : 6} ${w * .5} 5 T${w - 4} 6 V30 Q${w / 2} 38 4 30 Z" fill="#7aff4a" opacity="${fr ? 0.95 : 0.75}"/>
+      <path d="M4 4 Q${w * .3} ${L(6, 10)} ${w * .5} 5 T${w - 4} 6 V30 Q${w / 2} 38 4 30 Z" fill="#7aff4a" opacity="${L(0.75, 0.95)}"/>
       ${trefoil(w / 2, 18, 0.7, '#1a2a10')}
       <rect x="0" y="0" width="${w}" height="6" fill="#ffd23f" stroke="#8a6a10" stroke-width="1.2"/>
       ${Array.from({ length: Math.ceil(w / 12) }, (_, i) => `<path d="M${i * 12} 6 l6 -6" stroke="#1a1a1a" stroke-width="3"/>`).join('')}
       ${[-2, w + 2].map(x => `<g transform="translate(${x} 0)"><path d="M0 0 v-34" stroke="#5a646e" stroke-width="3"/><path d="M-11 -50 L11 -50 L0 -32 Z" fill="#ffd23f" stroke="#1a1a1a" stroke-width="2" stroke-linejoin="round"/>${trefoil(0, -44, 0.32, '#1a1a1a')}</g>`).join('')}
-      ${fr ? `<circle cx="${f(w * .3)}" cy="-14" r="2.4" fill="#d8ff6a"/><circle cx="${f(w * .62)}" cy="-24" r="2" fill="#d8ff6a"/><circle cx="${f(w * .8)}" cy="-10" r="1.6" fill="#d8ff6a"/>` : `<circle cx="${f(w * .45)}" cy="-8" r="1.8" fill="#d8ff6a"/>`}`;
+      <g opacity="${f(fr)}"><circle cx="${f(w * .3)}" cy="${L(-6, -14)}" r="2.4" fill="#d8ff6a"/><circle cx="${f(w * .62)}" cy="${L(-10, -24)}" r="2" fill="#d8ff6a"/><circle cx="${f(w * .8)}" cy="${L(-4, -10)}" r="1.6" fill="#d8ff6a"/></g>
+      <circle cx="${f(w * .45)}" cy="${L(-8, -14)}" r="1.8" fill="#d8ff6a" opacity="${L(1, 0.4)}"/>`;
   },
   platform(w) {
     // a metal catwalk with hazard edging

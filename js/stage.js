@@ -8,7 +8,7 @@ import { loadImage, rasterize } from './assets.js';
 import { INTRO_TIME } from './game.js';
 
 export const SFX = ['swing', 'swingHeavy', 'hit', 'hitHeavy', 'guard', 'miss', 'jump', 'land', 'charge', 'super', 'quake', 'ko',
-  'round', 'fight', 'trade', 'trap', 'move', 'select', 'back', 'win', 'shout', 'boom', 'bow', 'whirl',
+  'round', 'fight', 'trade', 'trap', 'move', 'select', 'back', 'win', 'heal', 'shout', 'boom', 'bow', 'whirl',
   'chargeUp', 'parry', 'gun', 'crack', 'chomp', 'snip', 'vs'];
 const STEP = 1 / 120;
 const MAX_TEX = 4096;
@@ -190,6 +190,10 @@ class FightScene extends Phaser.Scene {
       ...this.model.settings.weapons.map(w => sheet(base + t.characters[w].portrait, clamp(px * 110 / 128, 1, 3))),
       ...this.model.settings.weapons.map(w => Promise.all(t.characters[w].sheets.map(p => sheet(base + p, charScale))))
     ]);
+    // supply drop carrier + item for this map: frames c0/c1 (carrying, flapping), k0 (carrier), it (item)
+    const sx = t.extras.supply, supply = await sheet(base + sx.sheets[this.model.mapId], charScale);
+    ['c0', 'c1', 'k0', 'it'].forEach((n, k) => { if (!supply.tex.has(n)) supply.tex.add(n, 0, k * sx.cell[0] * supply.k, 0, sx.cell[0] * supply.k, sx.cell[1] * supply.k); });
+    this.supplySheet = supply;
     this.portraits = [por0, por1];
     const bc = t.extras.bull.cell;
     for (let fr = 0; fr < t.extras.bull.frames; fr++) if (!bull.tex.has(`b${fr}`)) bull.tex.add(`b${fr}`, 0, fr * bc[0] * bull.k, 0, bc[0] * bull.k, bc[1] * bull.k);
@@ -474,6 +478,11 @@ class FightScene extends Phaser.Scene {
         this.sfx('crack', { volume: 0.8, rate: 0.8 });
       } else if (e.type === 'lassoMiss') {
         this.sfx('crack', { volume: 0.5, rate: 0.7 });
+      } else if (e.type === 'rush') {
+        // Genghis spurs the horse: a burst of dust behind and a thud of hooves
+        this.fx.dust.explode(12, e.x - e.dir * 30, e.y);
+        this.sfx('land', { volume: 0.6, rate: 0.7 });
+        cam.shake(120, 0.004);
       } else if (e.type === 'reel') {
         this.fx.dust.explode(6, e.x, e.y);
         this.sfx('crack', { volume: 0.6, rate: 1.2 });
@@ -508,6 +517,19 @@ class FightScene extends Phaser.Scene {
         this.fx.dust.explode(3, e.x, e.y);
         const a = this.add.image(e.x, e.y - 4, 'fx-arrow').setRotation(e.dir > 0 ? 0.6 : Math.PI - 0.6).setDepth(6);
         this.tweens.add({ targets: a, alpha: 0, delay: 500, duration: 300, onComplete: () => a.destroy() });
+      } else if (e.type === 'supply') {
+        this.sfx('select', { volume: 0.35, rate: 0.8 });
+      } else if (e.type === 'landed') {
+        // the carrier lets go and flies off; the item stays and blinks
+        const sx = this.theme.extras.supply, k = this.supplySheet.k;
+        const c = this.add.image(e.x, e.y, this.supplySheet.key, 'k0').setOrigin(sx.origin[0] / sx.cell[0], sx.origin[1] / sx.cell[1]).setScale(1 / k).setDepth(15);
+        this.tweens.add({ targets: c, x: e.x + 90, y: e.y - 160, alpha: 0, duration: 1000, ease: 'Quad.easeIn', onComplete: () => c.destroy() });
+        this.fx.dust.explode(4, e.x, e.y);
+      } else if (e.type === 'heal') {
+        this.popText(`+${e.amount}`, e.x, e.y - 20, '#7dff8a', e.big ? 22 : 18);
+        this.ring(e.x, e.y, 0x7dff8a, e.big ? 1.6 : 1.1);
+        this.flashStar(e.x, e.y, e.big ? 1.1 : 0.7, 0xb8ffc0);
+        this.sfx('heal', { volume: 0.7 });
       } else if (e.type === 'bull') {
         cam.shake(700, 0.006);
         this.sfx('quake', { volume: 0.8 });
@@ -655,12 +677,14 @@ class FightScene extends Phaser.Scene {
   sync(dt) {
     const g = this.model, cam = this.cameras.main;
     this.updateFocus(dt);
-    const tf = Math.floor(g.t * 3) % 2;
+    // 8-frame traps: loops run at 12 fps; reacting traps idle on frames 0-3 and shake on 4-7
+    const tf = Math.floor(g.t * 12) % 8;
     const react = g.map.trapReact;
     (this.traps || []).forEach((s, k) => {
       const t = g.layout.traps[k];
       // the library guard only turns to yell while someone stands on his yellow floor
-      s.setFrame(`f${react ? (g.fighters.some(f => f.inTrap && f.x > t.x && f.x < t.x + t.w) ? 1 : 0) : tf}`);
+      const busy = react && g.fighters.some(f => f.inTrap && f.x > t.x && f.x < t.x + t.w);
+      s.setFrame(`f${react ? (busy ? 4 + Math.floor(g.t * 16) % 4 : Math.floor(g.t * 4) % 4) : tf}`);
     });
 
     this.shadows.clear();
@@ -689,7 +713,7 @@ class FightScene extends Phaser.Scene {
       }
       if (v.glow) v.glow.active = !!f.super;
       // dash afterimages
-      const dashing = (f.super || f.airDash?.t < 0.3) && Math.abs(f.vx) > 100;
+      const dashing = (f.rush || f.super || f.airDash?.t < 0.3) && Math.abs(f.vx) > 100;
       v.ghosts.forEach((gh, n) => {
         gh.setVisible(dashing);
         if (dashing) show(gh).setScale(sx, sy).setPosition(f.x - f.vx * 0.025 * (n + 1), f.y).setAlpha(0.32 - n * 0.09);
@@ -714,6 +738,7 @@ class FightScene extends Phaser.Scene {
       } else v.gather.setVisible(false);
     });
     this.syncProjectiles(g);
+    this.syncSupply(g);
     this.drawLash(g);
     this.drawWhirl(g);
     const bull = g.bull, bs = this.bullSprite, bx = this.theme.extras.bull;
@@ -724,6 +749,27 @@ class FightScene extends Phaser.Scene {
     }
     this.drawHud();
     this.sortCameras();
+  }
+
+  // Supply drops: a flapping carrier while falling; once down, the item blinks out its last seconds.
+  // Big drops (x2 mode) are larger and glow.
+  syncSupply(g) {
+    const sx = this.theme.extras.supply, sh = this.supplySheet;
+    this.supplyPool ??= [];
+    while (this.supplyPool.length < g.items.length) {
+      const glow = this.add.image(0, 0, 'fx-aura').setBlendMode(Phaser.BlendModes.ADD).setDepth(13);
+      const spr = this.add.sprite(0, 0, sh.key, 'c0').setOrigin(sx.origin[0] / sx.cell[0], sx.origin[1] / sx.cell[1]).setDepth(14);
+      this.supplyPool.push({ spr, glow });
+    }
+    this.supplyPool.forEach(({ spr, glow }, k) => {
+      const it = g.items[k];
+      spr.setVisible(!!it); glow.setVisible(!!it?.big);
+      if (!it) return;
+      const s = (it.big ? 1.25 : 1) / sh.k, falling = it.state === 'fall';
+      spr.setFrame(falling ? `c${Math.floor(g.t * 6) % 2}` : 'it').setScale(s).setPosition(it.x, it.y + (falling ? Math.sin(g.t * 3 + k) * 2 : 0))
+        .setAlpha(falling || Math.floor(it.t * 8) % 2 === 0 ? 1 : 0.25);
+      if (it.big) glow.setPosition(it.x, it.y - 14).setScale(0.45 + 0.08 * Math.sin(g.t * 6)).setAlpha(spr.alpha * 0.8);
+    });
   }
 
   syncProjectiles(g) {

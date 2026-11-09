@@ -28,9 +28,9 @@ function setup(w1 = 'sword', w2 = 'sword', map = 'seoul') {
 }
 const run = (g, secs, ia = () => NO_INPUT, ib = () => NO_INPUT) => { for (let t = 0; t < secs - 1e-9; t += DT) g.update(DT, [ia(t), ib(t)]); };
 
-test('v11: version bumped on the title and in the service worker cache', () => {
-  assert.equal(APP_VERSION, 'v11');
-  assert.match(readFileSync(new URL('../sw.js', import.meta.url), 'utf8'), /versus-v11/);
+test('version: the title and the service worker cache carry the same version', () => {
+  assert.match(APP_VERSION, /^v\d+$/);
+  assert.ok(readFileSync(new URL('../sw.js', import.meta.url), 'utf8').includes(`versus-${APP_VERSION}'`));
 });
 
 /* ---------- charge ---------- */
@@ -280,8 +280,8 @@ test('layout: touch buttons only for players that need them; none → the view f
   const both = computeLayout(1280, 720, { players: 2 });
   const p2only = computeLayout(1280, 720, { players: 2, touch: [1] });
   const none = computeLayout(1280, 720, { players: 2, touch: [] });
-  assert.equal(both.buttons.length, 10);
-  assert.equal(p2only.buttons.length, 5);
+  assert.equal(both.buttons.length, 8);   // per player: joystick + 3 buttons
+  assert.equal(p2only.buttons.length, 4);
   assert.ok(p2only.buttons.every(b => b.player === 1));
   assert.equal(none.buttons.length, 0);
   assert.ok(none.view.w > p2only.view.w && p2only.view.w >= both.view.w);

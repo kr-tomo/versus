@@ -85,6 +85,8 @@ const SFX = {
   snip:   render(0.3, [{ freq: 1800, d: 0.02, gain: 0.5 }, { type: 'noise', cut: () => 0.8, d: 0.01, gain: 0.5 }, { freq: 2100, at: 0.12, d: 0.02, gain: 0.5 }, { type: 'noise', cut: () => 0.8, at: 0.12, d: 0.01, gain: 0.5 }]),
   // VS slam: a thunderclap with a fiery roar
   vs:     render(1.0, [{ type: 'noise', cut: () => 0.9, a: 0.001, d: 0.04, gain: 1.2 }, { type: 'noise', cut: t => 0.25 * Math.exp(-t * 2) + 0.02, a: 0.01, d: 0.35, gain: 1.2 }, { freq: t => 60 * Math.exp(-t), d: 0.4, gain: 0.9 }, { type: 'saw', freq: 110, at: 0.02, d: 0.25, gain: 0.25 }]),
+  // a bright rising chime for picking up a supply drop
+  heal:   render(0.7, [784, 988, 1175, 1568].map((f, i) => ({ freq: f, at: i * 0.06, d: 0.18, gain: 0.35 }))),
   win:    render(1.1, [523, 659, 784, 1047].map((f, i) => ({ type: 'square', freq: f, at: i * 0.12, d: i === 3 ? 0.4 : 0.1, gain: 0.3 })))
 };
 

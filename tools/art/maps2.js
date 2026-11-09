@@ -54,15 +54,16 @@ const ship = {
     return s;
   },
   trap(w, fr) {
-    const r = rng(70 + fr);
+    const r = rng(70);
     let s = `<rect x="0" y="0" width="${w}" height="44" fill="#2a1a12"/>`;
     for (let x = 0; x < w; x += 18) s += `<rect x="${x}" y="1" width="16" height="10" fill="#3a2214" stroke="#160c08" stroke-width="1"/><path d="M${x + 3} 6 l6 -2 l4 3" stroke="#ff7a1a" stroke-width="1.4" fill="none"/>`;
     for (let i = 0; i < 4; i++) {
-      const x = 10 + i * (w - 20) / 3, h = 26 + r() * 14 + (fr ? 6 : 0);
-      s += `<path d="M${f(x - 10)} 2 Q${f(x - 12)} ${f(-h * 0.5)} ${f(x + (fr ? 3 : -3))} ${f(-h)} Q${f(x + 4)} ${f(-h * 0.55)} ${f(x + 11)} 2 Z" fill="#ff7a1a" stroke="#c2410c" stroke-width="1.4"/>
-        <path d="M${f(x - 5)} 2 Q${f(x - 5)} ${f(-h * 0.3)} ${f(x + (fr ? -1 : 2))} ${f(-h * 0.62)} Q${f(x + 3)} ${f(-h * 0.3)} ${f(x + 6)} 2 Z" fill="#ffd23f"/>`;
+      // each flame grows and sways in its own rhythm
+      const ph = (fr + i * 0.37) % 1, sw = Math.sin(ph * Math.PI * 2), x = 10 + i * (w - 20) / 3, h = 26 + r() * 14 + 6 * (0.5 + 0.5 * sw);
+      s += `<path d="M${f(x - 10)} 2 Q${f(x - 12)} ${f(-h * 0.5)} ${f(x + 3 * sw)} ${f(-h)} Q${f(x + 4)} ${f(-h * 0.55)} ${f(x + 11)} 2 Z" fill="#ff7a1a" stroke="#c2410c" stroke-width="1.4"/>
+        <path d="M${f(x - 5)} 2 Q${f(x - 5)} ${f(-h * 0.3)} ${f(x + 0.5 - 1.5 * sw)} ${f(-h * 0.62)} Q${f(x + 3)} ${f(-h * 0.3)} ${f(x + 6)} 2 Z" fill="#ffd23f"/>`;
     }
-    if (fr) s += `<circle cx="${f(w * .3)}" cy="-40" r="2" fill="#ffb347"/><circle cx="${f(w * .7)}" cy="-48" r="1.6" fill="#ffe066"/>`;
+    s += `<g opacity="${f(fr)}"><circle cx="${f(w * .3)}" cy="${f(-30 - fr * 12)}" r="2" fill="#ffb347"/><circle cx="${f(w * .7)}" cy="${f(-36 - fr * 14)}" r="1.6" fill="#ffe066"/></g>`;
     return s;
   },
   platform(w) {
@@ -163,9 +164,8 @@ const lion = (fr) => `<g>
   <circle cx="-14" cy="-30" r="5" fill="#e0a24a" stroke="${OL}" stroke-width="2"/><circle cx="14" cy="-30" r="5" fill="#e0a24a" stroke="${OL}" stroke-width="2"/>
   <path d="M-8 -20 l5 2 M8 -20 l-5 2" stroke="${OL}" stroke-width="2.5" stroke-linecap="round"/>
   <path d="M-4 -12 h8 l-4 4 Z" fill="#3a1a10"/>
-  ${fr
-    ? `<path d="M-10 -6 Q0 12 10 -6 Z" fill="#7a1a1a" stroke="${OL}" stroke-width="2"/><path d="M-8 -6 l2 5 l2 -5 M4 -6 l2 5 l2 -5" fill="#fff"/>`
-    : `<path d="M-6 -4 Q0 0 6 -4" stroke="${OL}" stroke-width="2" fill="none"/>`}
+  <g opacity="${f(1 - fr)}"><path d="M-6 -4 Q0 0 6 -4" stroke="${OL}" stroke-width="2" fill="none"/></g>
+  <g opacity="${f(fr)}" transform="translate(0 -6) scale(1 ${f(0.3 + 0.7 * fr)}) translate(0 6)"><path d="M-10 -6 Q0 12 10 -6 Z" fill="#7a1a1a" stroke="${OL}" stroke-width="2"/><path d="M-8 -6 l2 5 l2 -5 M4 -6 l2 5 l2 -5" fill="#fff"/></g>
 </g>`;
 
 const rome = {
@@ -198,7 +198,7 @@ const rome = {
   },
   trap(w, fr) {
     return `<rect x="0" y="0" width="${w}" height="44" fill="#1e140c"/>
-      <g transform="translate(${w / 2} ${fr ? 20 : 28})">${lion(fr)}</g>
+      <g transform="translate(${w / 2} ${f(28 - fr * 8)})">${lion(fr)}</g>
       ${Array.from({ length: Math.floor(w / 12) + 1 }, (_, i) => `<line x1="${i * 12 + 2}" y1="0" x2="${i * 12 + 2}" y2="10" stroke="#5a5a62" stroke-width="3"/>`).join('')}
       <rect x="-4" y="-2" width="${w + 8}" height="6" fill="#6a6a72" stroke="#2a2a30" stroke-width="1.5"/>
       <path d="M-4 0 L2 44 M${w + 4} 0 L${w - 2} 44" stroke="#8a7a5a" stroke-width="6"/>`;
@@ -211,13 +211,18 @@ const rome = {
 };
 
 /* ---------- Egypt: pyramids and palms; cobras rise from the snake pit ---------- */
-const cobra = (x, fr, flip) => `<g transform="translate(${x} 30) scale(${flip ? -1 : 1} 1)">
-  <path d="M0 14 Q-8 0 0 ${fr ? -26 : -12} Q6 ${fr ? -34 : -18} 2 ${fr ? -40 : -24}" stroke="${OL}" stroke-width="9" fill="none" stroke-linecap="round"/>
-  <path d="M0 14 Q-8 0 0 ${fr ? -26 : -12} Q6 ${fr ? -34 : -18} 2 ${fr ? -40 : -24}" stroke="#6a8a2a" stroke-width="5.5" fill="none" stroke-linecap="round"/>
-  <path d="M-9 ${fr ? -34 : -18} Q2 ${fr ? -52 : -34} 13 ${fr ? -34 : -18} Q2 ${fr ? -28 : -12} -9 ${fr ? -34 : -18} Z" fill="#8aa83a" stroke="${OL}" stroke-width="1.8"/>
-  <circle cx="5" cy="${fr ? -42 : -26}" r="1.6" fill="#ffd23f"/>
-  ${fr ? `<path d="M8 -42 l8 2 l-2 3 M8 -42 l8 -1" stroke="#d0262e" stroke-width="1.5" fill="none"/>` : ''}
+const cobra = (x, fr, flip) => {
+  // the head rises out of the pit as fr goes 0 → 1; the tongue flicks near the top
+  const L = (a, b) => f(a + (b - a) * fr);
+  const neck = `M0 14 Q-8 0 0 ${L(-12, -26)} Q6 ${L(-18, -34)} 2 ${L(-24, -40)}`;
+  return `<g transform="translate(${x} 30) scale(${flip ? -1 : 1} 1)">
+  <path d="${neck}" stroke="${OL}" stroke-width="9" fill="none" stroke-linecap="round"/>
+  <path d="${neck}" stroke="#6a8a2a" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  <path d="M-9 ${L(-18, -34)} Q2 ${L(-34, -52)} 13 ${L(-18, -34)} Q2 ${L(-12, -28)} -9 ${L(-18, -34)} Z" fill="#8aa83a" stroke="${OL}" stroke-width="1.8"/>
+  <circle cx="5" cy="${L(-26, -42)}" r="1.6" fill="#ffd23f"/>
+  <path d="M8 ${L(-26, -42)} l8 2 l-2 3 M8 ${L(-26, -42)} l8 -1" stroke="#d0262e" stroke-width="1.5" fill="none" opacity="${f(Math.max(0, fr * 2 - 1))}"/>
 </g>`;
+};
 
 const egypt = {
   extras: { posts: '#c9a46a' },

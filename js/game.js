@@ -1,7 +1,8 @@
 import {
   MAPS, MAP_IDS, VIEW_W, WORLD_W, SPAWN_X, BODY_HALF_W, BODY_H, GROUND_Y,
   HIT_CONFIRM, HITSTOP_BASE, HITSTOP_PER_DMG, HITSTOP_MAX, HITSTOP_GUARD, HIT_STUN, KNOCKBACK_PER_DMG,
-  ARROW_RANGE, ARROW_APEX, ARROW_SPEED, ARROW_MULT, BULLET_RANGE, BULLET_SPEED, BULLET_MULT
+  ARROW_RANGE, ARROW_APEX, ARROW_SPEED, ARROW_MULT, BULLET_RANGE, BULLET_SPEED, BULLET_MULT,
+  SUPPLY_EVERY, SUPPLY_HEAL, SUPPLY_BIG, SUPPLY_FALL, SUPPLY_LINGER, MAX_ENERGY
 } from './config.js';
 import { createFighter, stepFighter, NO_INPUT, dashing, attackPhase } from './fighter.js';
 import { detectHits, confirmHit } from './combat.js';
@@ -77,6 +78,8 @@ export class Game {
     this.hitstop = 0;
     this.bull = null;
     this.projectiles = [];
+    this.items = [];
+    this.supplyT = SUPPLY_EVERY;
   }
 
   get world() { return { platforms: this.layout.platforms, ice: this.map.ice, gravity: this.map.gravity ?? 1 }; }
@@ -137,6 +140,7 @@ export class Game {
           this.effects.push({ type: 'muzzle', x: b.x, y: b.y, dir: me.facing, t: 0, life: 0.25 });
         } else this.projectiles.push(makeArrow(me, i));
       }
+      if (me.rush && me.rush.t === 0) this.effects.push({ type: 'rush', who: i, x: me.x, y: me.y, dir: me.rush.dir, t: 0, life: 0.4 });
       if (me.reel && me.reel.t === 0) this.effects.push({ type: 'reel', who: i, x: me.x, y: me.y, dir: me.reel.dir, t: 0, life: 0.3 });
       this.updateLasso(me, op, i, dt);
       const bull = me.super?.def.bull;
@@ -153,6 +157,7 @@ export class Game {
 
     this.updateBull(dt, live);
     this.updateProjectiles(dt, live);
+    if (live) this.updateSupply(dt);
     if (live) {
       this.resolveContacts(dt);
       for (const f of this.fighters) this.applyTrap(f, dt);
@@ -232,7 +237,7 @@ export class Game {
         p.x = p.x0 + p.dir * p.u * p.range;
         p.y = p.feet - (p.a * p.u * p.u + p.b * p.u + p.c);
         const inside = Math.abs(op.x - p.x) < hw + 4 && p.y > op.y - h - 4 && p.y < op.y + 2;
-        if (live && !op.ko && !op.super && !dashing(op) && inside) {
+        if (live && !op.ko && !op.super && !dashing(op) && !op.rush && inside) { // arrows/bullets can't stop a rush
           p.done = true;
           const s = { kind: 'charged', dmg: p.dmg, kb: p.dmg * KNOCKBACK_PER_DMG, stun: HIT_STUN };
           this.hitFrom({ facing: p.dir, x: p.x, stats: {} }, op, s, p.x, 1 - p.owner);
@@ -242,7 +247,7 @@ export class Game {
           p.x += p.dir * BULLET_SPEED * dt;
           if (Math.abs(p.x - p.x0) >= p.range) { p.x = p.x0 + p.dir * p.range; p.dropping = true; p.vx = p.dir * 60; p.vy = 0; }
           const inside = Math.abs(op.x - p.x) < hw + 4 && p.y > op.y - h - 4 && p.y < op.y + 2;
-          if (live && !op.ko && !op.super && !dashing(op) && inside) {
+          if (live && !op.ko && !op.super && !dashing(op) && !op.rush && inside) { // arrows/bullets can't stop a rush
             p.done = true;
             const s = { kind: 'charged', dmg: p.dmg, kb: p.dmg * KNOCKBACK_PER_DMG, stun: HIT_STUN };
             this.hitFrom({ facing: p.dir, x: p.x, stats: {} }, op, s, p.x, 1 - p.owner);
@@ -275,6 +280,39 @@ export class Game {
     this.effects.push({ type: hitType(e), who, big: !!s.super || e.damage >= 18, x: e.x, y: e.y, dmg: e.damage, dir: att.facing, t: 0 });
     this.hitstop = Math.max(this.hitstop, hitstopFor(e));
     return e;
+  }
+
+  // Recovery mode: drops fall under a carrier, land on a platform or the ground, blink and vanish.
+  updateSupply(dt) {
+    const mode = this.settings.supply ?? 'off';
+    if (mode !== 'off' && (this.supplyT -= dt) <= 0) {
+      this.supplyT = SUPPLY_EVERY;
+      this.drops = (this.drops || 0) + 1;
+      const big = mode === 'x2' && this.drops % 2 === 0;
+      const x = this.cam + 60 + this.rand() * (VIEW_W - 120);
+      this.items.push({ x, y: -20, state: 'fall', t: 0, big, heal: Math.round(MAX_ENERGY * (big ? SUPPLY_BIG : SUPPLY_HEAL)) });
+      this.effects.push({ type: 'supply', x, t: 0 });
+    }
+    for (const it of this.items) {
+      it.t += dt;
+      if (it.state === 'fall') {
+        const prevY = it.y;
+        it.y += SUPPLY_FALL * dt;
+        // lands on the first platform (or the ground) it passes through
+        const p = this.layout.platforms.find(p => it.x >= p.x && it.x <= p.x + p.w && prevY <= p.y && it.y >= p.y);
+        const floor = p ? p.y : it.y >= GROUND_Y ? GROUND_Y : null;
+        if (floor !== null) { it.y = floor; it.state = 'land'; it.t = 0; this.effects.push({ type: 'landed', x: it.x, y: it.y, t: 0 }); }
+      } else if (it.t >= SUPPLY_LINGER) it.done = true;
+      // anyone touching the item (even while it is still coming down) takes it
+      const f = this.fighters.find(f => !f.ko && Math.abs(f.x - it.x) < (f.stats.halfW ?? BODY_HALF_W) + 12 && it.y > f.y - (f.stats.height ?? BODY_H) - 6 && it.y - 26 < f.y);
+      if (f && !it.done) {
+        it.done = true;
+        const before = f.energy;
+        f.energy = Math.min(MAX_ENERGY, f.energy + it.heal);
+        this.effects.push({ type: 'heal', who: this.fighters.indexOf(f), x: it.x, y: it.y - 14, amount: f.energy - before, big: it.big, t: 0, life: 0.9 });
+      }
+    }
+    this.items = this.items.filter(it => !it.done);
   }
 
   updateBull(dt, live) {

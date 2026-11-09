@@ -1,4 +1,4 @@
-import { WEAPONS, WEAPON_IDS, MAPS, MAP_IDS, WIN_OPTIONS, TIME_OPTIONS, MAX_POWER, MAX_REACH, SUPERS, APP_VERSION } from './config.js';
+import { WEAPONS, WEAPON_IDS, MAPS, MAP_IDS, WIN_OPTIONS, TIME_OPTIONS, MAX_POWER, MAX_REACH, SUPERS, APP_VERSION, SUPPLY_MODES } from './config.js';
 import { computeLayout } from './layout.js';
 import { loadTheme } from './assets.js';
 import { InputManager } from './input.js';
@@ -10,7 +10,7 @@ import { moveList } from './moves.js';
 
 const $ = s => document.querySelector(s);
 const stageEl = $('#stage'), controls = $('#controls'), pauseBtn = $('#pauseBtn'), exitBtn = $('#exitBtn'), hints = $('#hints');
-const LABEL = { left: '◀', right: '▶', attack: '공격', guard: '방어', jump: '점프' };
+const LABEL = { attack: '공격', guard: '방어', jump: '점프' };
 const MODE_LABEL = { '2p': '2인 대전', easy: '컴퓨터 · 쉬움', hard: '컴퓨터 · 어려움' };
 // default focus and the B button for each activeScreen
 const SCREENS = {
@@ -32,7 +32,8 @@ const store = {
   load() { try { return JSON.parse(localStorage.getItem('versus.settings')) || {}; } catch { return {}; } },
   save(v) { try { localStorage.setItem('versus.settings', JSON.stringify(v)); } catch { /* storage unavailable */ } }
 };
-const settings = Object.assign({ mode: '2p', weapons: ['sword', 'axe'], map: 'random', wins: 3, time: 90, sound: true }, store.load());
+const settings = Object.assign({ mode: '2p', weapons: ['sword', 'axe'], map: 'random', wins: 3, time: 90, sound: true, supply: 'off' }, store.load());
+const SUPPLY_LABEL = { off: '없음', on: '보급', x2: '보급x2' };
 
 let theme, stage, input, nav, game = null, ai = null, paused = false, resultShown = false, activeScreen = 'title';
 const focused = new Map(); // activeScreen id → last focused element
@@ -226,6 +227,7 @@ function buildSetup() {
   $('#winsBtn').onclick = () => { settings.wins = WIN_OPTIONS[(WIN_OPTIONS.indexOf(settings.wins) + 1) % WIN_OPTIONS.length]; refreshSetup(); };
   $('#timeBtn').onclick = () => { settings.time = TIME_OPTIONS[(TIME_OPTIONS.indexOf(settings.time) + 1) % TIME_OPTIONS.length]; refreshSetup(); };
   $('#soundBtn').onclick = () => { settings.sound = !settings.sound; stage.setMuted(!settings.sound); refreshSetup(); };
+  $('#supplyBtn').onclick = () => { settings.supply = SUPPLY_MODES[(SUPPLY_MODES.indexOf(settings.supply) + 1) % SUPPLY_MODES.length]; refreshSetup(); };
   $('#setup .back').onclick = () => show('title');
   $('#startBtn').onclick = startFromSetup;
 }
@@ -247,6 +249,8 @@ function refreshSetup() {
   $('#winsBtn').innerHTML = `<small>승수</small>${settings.wins}승`;
   $('#timeBtn').innerHTML = `<small>시간</small>${settings.time}초`;
   $('#soundBtn').innerHTML = `<small>효과음</small>${settings.sound ? '켜짐' : '꺼짐'}`;
+  if (!SUPPLY_MODES.includes(settings.supply)) settings.supply = 'off';
+  $('#supplyBtn').innerHTML = `<small>회복 아이템</small>${SUPPLY_LABEL[settings.supply]}`;
   store.save(settings);
   updateHints();
 }
@@ -315,13 +319,13 @@ function onResize() {
   Object.assign(stageEl.style, { left: `${il + v.x}px`, top: `${it + v.y}px`, width: `${v.w}px`, height: `${v.h}px` });
   try { stage.resize(Math.round(v.w * dpr), Math.round(v.h * dpr)); } catch (e) { report('resize', e); }
   controls.innerHTML = layout.buttons.map(b =>
-    `<div class="pad p${b.player} a-${b.action}" data-player="${b.player}" data-action="${b.action}" style="left:${il + b.x - b.r}px;top:${it + b.y - b.r}px;width:${b.r * 2}px;height:${b.r * 2}px;font-size:${Math.round(b.r * (b.action === 'left' || b.action === 'right' ? 0.7 : 0.5))}px">${LABEL[b.action]}</div>`).join('');
+    `<div class="pad p${b.player} a-${b.action}" data-player="${b.player}" data-action="${b.action}" style="left:${il + b.x - b.r}px;top:${it + b.y - b.r}px;width:${b.r * 2}px;height:${b.r * 2}px;font-size:${Math.round(b.r * 0.5)}px">${b.action === 'stick' ? '<i class="knob"></i>' : LABEL[b.action]}</div>`).join('');
   // pause and exit sit under the round timer, between the two super gauges
   const ps = Math.round(Math.max(30, v.h * 0.085)), gap = Math.round(ps * 0.2), top = it + v.y + v.h * (46 / 360);
   Object.assign(pauseBtn.style, { left: `${il + v.x + v.w / 2 - ps - gap / 2}px`, top: `${top}px`, width: `${ps}px`, height: `${ps}px`, fontSize: `${ps * 0.42}px` });
   Object.assign(exitBtn.style, { left: `${il + v.x + v.w / 2 + gap / 2}px`, top: `${top}px`, width: `${ps}px`, height: `${ps}px`, fontSize: `${ps * 0.42}px` });
   // fingers resting on buttons that just went away must not stay pressed
-  input.pointers.clear();
+  input.pointers.clear(); input.sticks.clear();
   updateHints();
 }
 

@@ -2,7 +2,7 @@ import {
   WEAPONS, SUPERS, MAX_ENERGY, GROUND_Y, GRAVITY, JUMP_V, WALK_SPEED, KNOCKBACK_SPEED,
   DROP_THROUGH_TIME, ICE_ACCEL, ICE_DECEL, GUARD_MOVE, SUPER_MAX, SUPER_HOLD, HIT_STUN,
   LONG_ATTACK_SLOW, HEAVY_MOVE, DOUBLE_JUMP_V, FLIP_TIME, DIVE_SPEED, DIVE_LAND_RECOVERY, canDoubleJump,
-  TURN_DELAY, CHARGE_TIME, AIR_DASH_DIST, AIR_DASH_TIME, AIR_DASH_ATTACK, BODY_H,
+  TURN_DELAY, RUSH_TIME, RUSH_COOLDOWN, CHARGE_TIME, AIR_DASH_DIST, AIR_DASH_TIME, AIR_DASH_ATTACK, BODY_H,
   BLINK_TAP, BLINK_HOLD, BLINK_DIST, BLINK_COOLDOWN, HOLD_HASTE, GUN_LOAD, REEL_DIST, REEL_TIME, REEL_COOLDOWN
 } from './config.js';
 
@@ -15,7 +15,7 @@ export function createFighter(weapon, x, facing) {
     meter: 0, charge: 0, super: null, kb: 0, kbDir: 0, drop: 0,
     canDouble: canDoubleJump(weapon), doubled: false, flipT: 0, airDash: null, wantFacing: facing, turnT: 0,
     lastFwd: Infinity, blinkArm: null, blinkCD: 0, blinked: false,
-    lastBack: Infinity, reelArm: null, reelCD: 0, reel: null, lashed: false, haste: false, guardPressT: -Infinity,
+    lastBack: Infinity, reelArm: null, reelCD: 0, reel: null, rush: null, rushCD: 0, lashed: false, haste: false, guardPressT: -Infinity,
     trapAcc: 0, inTrap: false, hitFlash: 0, ko: false, won: false, prevInput: NO_INPUT, walk: 0, t: 0
   };
 }
@@ -55,7 +55,7 @@ const attackOver = f => {
 
 // Stag beetle air dash: level flight, untouchable, no attacks until the very end.
 export const dashing = f => !!f.airDash && f.airDash.t < AIR_DASH_TIME;
-const dashLocked = f => (dashing(f) && f.airDash.t < AIR_DASH_TIME - AIR_DASH_ATTACK) || !!f.reel;
+const dashLocked = f => (dashing(f) && f.airDash.t < AIR_DASH_TIME - AIR_DASH_ATTACK) || !!f.reel || !!f.rush;
 
 // Current hit window of the running super, or null.
 export function superHit(f) {
@@ -116,15 +116,22 @@ export function stepFighter(f, input, dt, world) {
     if (f.super.t >= f.super.def.time) f.super = null;
   }
 
-  // dagger blink: tap forward twice and keep holding the second tap
+  // forward double-tap, second tap held: the dagger blinks, Genghis's horse rushes ahead
   f.lastFwd += dt; f.blinkCD = Math.max(0, f.blinkCD - dt); f.blinked = false;
-  if (f.stats.blink) {
+  f.rushCD = Math.max(0, f.rushCD - dt);
+  if (f.rush && ((f.rush.t += dt) >= RUSH_TIME || f.stun > 0 || f.ko || f.super)) f.rush = null;
+  if (f.stats.blink || f.stats.rush) {
     const fwd = f.facing > 0 ? 'right' : 'left';
     if (pressed(fwd)) { f.blinkArm = f.lastFwd < BLINK_TAP ? 0 : null; f.lastFwd = 0; }
     else if (!input[fwd]) f.blinkArm = null;
-    else if (f.blinkArm !== null && (f.blinkArm += dt) >= BLINK_HOLD && canAct && !f.attack && f.blinkCD <= 0) {
-      f.x += f.facing * BLINK_DIST * (f.stats.height ?? BODY_H);
-      f.blinked = true; f.blinkArm = null; f.blinkCD = BLINK_COOLDOWN;
+    else if (f.blinkArm !== null && (f.blinkArm += dt) >= BLINK_HOLD && canAct && !f.attack && !f.rush) {
+      if (f.stats.blink && f.blinkCD <= 0) {
+        f.x += f.facing * BLINK_DIST * (f.stats.height ?? BODY_H);
+        f.blinked = true; f.blinkArm = null; f.blinkCD = BLINK_COOLDOWN;
+      } else if (f.stats.rush && f.rushCD <= 0) {
+        f.rush = { t: 0, dir: f.facing };
+        f.blinkArm = null; f.rushCD = RUSH_COOLDOWN;
+      }
     }
   }
 
@@ -143,7 +150,7 @@ export function stepFighter(f, input, dt, world) {
   }
 
   // guard comes up after the weapon's guardUp time
-  f.guarding = canAct && input.guard && !f.attack && !f.reel;
+  f.guarding = canAct && input.guard && !f.attack && !f.reel && !f.rush;
   f.guardT = f.guarding ? f.guardT + dt : 0;
   f.guard = f.guarding && f.guardT >= f.stats.guardUp;
 
@@ -165,7 +172,7 @@ export function stepFighter(f, input, dt, world) {
     if (kind === 'airLash') { f.lashed = true; f.vx = 0; f.vy = 0; }
     f.attack = startAttack(f, kind, !f.onGround);
   }
-  if (canAct && !f.attack && !f.reel && f.onGround && pressed('jump')) { f.vy = -JUMP_V; f.onGround = false; f.platform = -1; }
+  if (canAct && !f.attack && !f.reel && !f.rush && f.onGround && pressed('jump')) { f.vy = -JUMP_V; f.onGround = false; f.platform = -1; }
   // double jump (short-reach fighters): a somersault in mid-air
   else if (canAct && !f.attack && !f.onGround && f.canDouble && !f.doubled && pressed('jump')) { f.vy = -DOUBLE_JUMP_V; f.doubled = true; f.flipT = 0; }
   // stag beetle: the second jump is a level dash in the travel direction
@@ -190,9 +197,14 @@ export function stepFighter(f, input, dt, world) {
   const hovering = f.attack?.kind === 'airLash' && !f.onGround && f.stun <= 0;
   if (f.ko) f.vx = approach(f.vx, 0, ICE_DECEL * dt);
   else if (f.super?.hover) { f.vx = 0; f.vy = 0; }   // carried by the super (game.js moves it)
-  else if (f.super) f.vx = dash ? dash[2] * f.facing : f.onGround ? 0 : f.vx;
+  else if (f.super) {
+    f.vx = dash ? dash[2] * f.facing : f.onGround || f.super.def.dash?.some(d => d[3]) ? 0 : f.vx;
+    // a rising dash climbs at a slant to `rise` body heights by its end
+    if (dash?.[3]) { f.vy = -dash[3] * (f.stats.height ?? BODY_H) / (dash[1] - dash[0]); f.onGround = false; f.platform = -1; }
+  }
   else if (hovering) { f.vx = 0; f.vy = 0; }
   else if (f.reel) f.vx = f.reel.dir * REEL_DIST * (f.stats.height ?? BODY_H) / REEL_TIME;
+  else if (f.rush) f.vx = f.rush.dir * BLINK_DIST * BODY_H / RUSH_TIME;
   else if (diving) { f.vx = f.facing * DIVE_SPEED * Math.SQRT1_2; f.vy = DIVE_SPEED * Math.SQRT1_2; }
   else if (dashing(f)) { f.vx = f.airDash.dir * AIR_DASH_DIST / AIR_DASH_TIME; f.vy = 0; }
   else if (world.ice && f.onGround) f.vx = approach(f.vx, target, (dir ? ICE_ACCEL : ICE_DECEL) * dt);
@@ -206,7 +218,8 @@ export function stepFighter(f, input, dt, world) {
   // vertical movement and landing (platforms are one-way)
   const prevY = f.y;
   if (!f.onGround) {
-    if (!diving && !hovering && !dashing(f) && !f.super?.hover) f.vy += GRAVITY * (world.gravity ?? 1) * dt;
+    const rising = f.super?.def.dash?.some(d => d[3] && f.super.t >= d[0] && f.super.t < d[1]);
+    if (!diving && !hovering && !dashing(f) && !f.super?.hover && !rising) f.vy += GRAVITY * (world.gravity ?? 1) * dt;
     f.y += f.vy * dt;
     if (f.vy >= 0) {
       if (f.drop <= 0) {
@@ -314,6 +327,7 @@ export function frameName(f) {
     return ph === 'active' ? pick(['windup>attack', 'attack'], ua * 2) : pick(RECOVER('attack'), ur);
   }
   if (f.reel) return pick(['airLash>fall', 'fall'], f.reel.t / 0.08);
+  if (f.rush) return WALK[Math.floor(f.rush.t * 40) % WALK.length]; // a fast gallop
   if (f.guarding) return f.onGround ? (f.guard ? 'guard' : pick(['idle0>guard0', 'guard0', 'guard0>guard'], f.guardT / f.stats.guardUp)) : 'airGuard';
   if (!f.onGround) {
     if (dashing(f)) return pick(['jump>airDash', 'airDash'], f.airDash.t / 0.06);

@@ -32,16 +32,18 @@ const lava = {
     for (let i = 0; i < 22; i++) { const x = r() * 1280, y = G + 10 + r() * 26; s += `<polyline points="${f(x)},${f(y)} ${f(x + 10 + r() * 10)},${f(y + 4)} ${f(x + 18 + r() * 14)},${f(y - 2)}" stroke="#ff6a00" stroke-width="1.5" fill="none" opacity=".7"/>`; }
     return s;
   },
+  // fr is a continuous phase 0..1 (build-sprites.mjs renders 8 frames going 0 → 1 → 0)
   trap(w, fr) {
-    const r = rng(40 + fr);
+    const r = rng(40);
     let s = `<defs><linearGradient id="lvMag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe066"/><stop offset=".35" stop-color="#ff8a1a"/><stop offset="1" stop-color="#b3200a"/></linearGradient>
       <radialGradient id="lvGlow2"><stop offset="0" stop-color="#ffb347" stop-opacity=".9"/><stop offset="1" stop-color="#ff4500" stop-opacity="0"/></radialGradient></defs>
       <ellipse cx="${w / 2}" cy="0" rx="${w / 2 + 16}" ry="${26 + fr * 4}" fill="url(#lvGlow2)" opacity=".8"/>
       <rect x="0" y="2" width="${w}" height="42" fill="url(#lvMag)"/>
-      <path d="M0 ${4 + fr * 2} Q${w * .25} ${fr ? 6 : -2} ${w * .5} ${4} T${w} ${4 + fr * 2}" stroke="#fff3a8" stroke-width="2.5" fill="none"/>
+      <path d="M0 ${f(4 + fr * 2)} Q${w * .25} ${f(-2 + fr * 8)} ${w * .5} ${4} T${w} ${f(4 + fr * 2)}" stroke="#fff3a8" stroke-width="2.5" fill="none"/>
       <path d="M-4 0 L2 44 M${w + 4} 0 L${w - 2} 44" stroke="#160c0a" stroke-width="6"/>`;
-    for (let i = 0; i < 4; i++) s += `<circle cx="${f(12 + r() * (w - 24))}" cy="${f(6 + r() * 14)}" r="${f(2 + r() * 4)}" fill="#ffe066" stroke="#ff8a1a" stroke-width="1.5"/>`;
-    if (fr) s += `<circle cx="${f(w * .3)}" cy="-12" r="2.5" fill="#ffb347"/><circle cx="${f(w * .7)}" cy="-20" r="2" fill="#ffe066"/>`;
+    // bubbles swell and rise; embers pop out as the magma heaves
+    for (let i = 0; i < 4; i++) s += `<circle cx="${f(12 + r() * (w - 24))}" cy="${f(6 + r() * 14 - fr * 3)}" r="${f((2 + r() * 4) * (0.7 + 0.5 * fr))}" fill="#ffe066" stroke="#ff8a1a" stroke-width="1.5"/>`;
+    s += `<g opacity="${f(fr)}"><circle cx="${f(w * .3)}" cy="${f(-4 - fr * 8)}" r="2.5" fill="#ffb347"/><circle cx="${f(w * .7)}" cy="${f(-8 - fr * 12)}" r="2" fill="#ffe066"/></g>`;
     return s;
   },
   platform(w) {
@@ -85,9 +87,11 @@ const jungle = {
   trap(w, fr) {
     let s = `<defs><linearGradient id="jgWater" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b8c8c"/><stop offset="1" stop-color="#0b3a44"/></linearGradient></defs>
       <rect x="0" y="0" width="${w}" height="44" fill="url(#jgWater)"/>
-      <path d="M0 ${8 - fr * 2} Q${w / 4} ${4 + fr * 4} ${w / 2} ${8} T${w} ${8 - fr * 2}" stroke="#9fe3d9" stroke-width="2" fill="none"/>`;
+      <path d="M0 ${f(8 - fr * 2)} Q${w / 4} ${f(4 + fr * 4)} ${w / 2} ${8} T${w} ${f(8 - fr * 2)}" stroke="#9fe3d9" stroke-width="2" fill="none"/>`;
     for (const sx of [-6, w - 6]) for (let k = 0; k < 3; k++) s += `<ellipse cx="${sx + 6}" cy="${4 + k * 13}" rx="9" ry="7" fill="${['#8d8f86', '#a2a49a', '#77796f'][k]}" stroke="#3a3b35" stroke-width="2"/>`;
-    s += fr ? fish(w * .62, -28, -20) + fish(w * .35, 24, 160) : fish(w * .35, -18, -55) + fish(w * .7, 22, 20);
+    // two piranhas leap and dive, their positions sliding between the two poses
+    const L = (a, b) => f(a + (b - a) * fr);
+    s += fish(L(w * .35, w * .62), L(-18, -28), L(-55, -20)) + fish(L(w * .7, w * .35), L(22, 24), L(20, 160));
     s += `<path d="M${f(w * .25)} 4 q4 -6 8 0 M${f(w * .5)} 6 q3 -5 6 0" stroke="#e8fbff" stroke-width="2" fill="none"/>`;
     return s;
   },
@@ -131,12 +135,12 @@ const seoul = {
     return s;
   },
   trap(w, fr) {
-    const spark = fr
-      ? `<polyline points="12,-4 20,-26 30,-14 38,-36 48,-16 ${w - 18},-30 ${w - 10},-4" stroke="#bff6ff" stroke-width="2.5" fill="none"/><polyline points="24,0 34,-18 46,-6 ${w - 24},-22" stroke="#ffe94d" stroke-width="2" fill="none"/>`
-      : `<polyline points="16,-2 26,-22 32,-12 42,-34 48,-18 58,-28 ${w - 10},-4" stroke="#bff6ff" stroke-width="2.5" fill="none"/><polyline points="30,0 38,-14 50,-8 62,-20" stroke="#ffe94d" stroke-width="2" fill="none"/>`;
+    const sparkB = `<polyline points="12,-4 20,-26 30,-14 38,-36 48,-16 ${w - 18},-30 ${w - 10},-4" stroke="#bff6ff" stroke-width="2.5" fill="none"/><polyline points="24,0 34,-18 46,-6 ${w - 24},-22" stroke="#ffe94d" stroke-width="2" fill="none"/>`;
+    const sparkA = `<polyline points="16,-2 26,-22 32,-12 42,-34 48,-18 58,-28 ${w - 10},-4" stroke="#bff6ff" stroke-width="2.5" fill="none"/><polyline points="30,0 38,-14 50,-8 62,-20" stroke="#ffe94d" stroke-width="2" fill="none"/>`;
+    // the two arcs crossfade so the sparks flicker between shapes
     return `<defs><filter id="soGlow2" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
       <rect x="6" y="0" width="${w - 12}" height="44" fill="#06070b"/><ellipse cx="${w / 2}" cy="2" rx="${w / 2 - 4}" ry="5" fill="#0b0d14" stroke="#5d606c" stroke-width="2"/>
-      <g filter="url(#soGlow2)">${spark}</g>
+      <g filter="url(#soGlow2)"><g opacity="${f(1 - fr)}">${sparkA}</g><g opacity="${f(fr)}">${sparkB}</g></g>
       <path d="M-6 0 l7 -22 l7 22 z M${w - 8} 0 l7 -22 l7 22 z" fill="#ff7a1a" stroke="#2a1508" stroke-width="1.5"/>
       <path d="M-3 -9 h8 M${w - 5} -9 h8" stroke="#fff" stroke-width="2.5"/>`;
   },
@@ -171,14 +175,14 @@ const tundra = {
       <path d="M0 ${G} ${Array.from({ length: 32 }, (_, i) => `Q${i * 40 + 20} ${G - 5} ${i * 40 + 40} ${G}`).join(' ')} L1280 ${G + 4} L0 ${G + 4} Z" fill="#ffffff" stroke="#cfe0f2" stroke-width="1.5"/>`;
   },
   trap(w, fr) {
-    const dx = fr ? 4 : 0;
+    const dx = f(fr * 4);
     return `<defs><linearGradient id="tdWater" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d5a8c"/><stop offset="1" stop-color="#061a33"/></linearGradient></defs>
       <path d="M0 2 Q${w / 2} 12 ${w} 2 L${w - 6} 44 L6 44 Z" fill="url(#tdWater)"/>
       <path d="M-8 1 q12 -6 24 0 q14 -5 26 1 q16 -6 30 0 q12 -4 ${w - 72} 0" stroke="#9fc4e6" stroke-width="3" fill="none"/>
       <path d="M-14 8 l10 -4 l-6 10 M${w + 14} 8 l-10 -4 l6 10" stroke="#9fc4e6" stroke-width="1.5" fill="none"/>
       <polygon points="${20 + dx},14 ${34 + dx},10 ${38 + dx},18 ${24 + dx},21" fill="#e3f2ff" stroke="#7fb8e0" stroke-width="1.5"/>
       <polygon points="${58 - dx},22 ${70 - dx},18 ${72 - dx},26" fill="#e3f2ff" stroke="#7fb8e0" stroke-width="1.5"/>
-      <ellipse cx="${w / 2}" cy="${-6 - fr * 3}" rx="${w / 2}" ry="10" fill="#e8f6ff" opacity="${fr ? .25 : .38}"/>`;
+      <ellipse cx="${w / 2}" cy="${f(-6 - fr * 3)}" rx="${w / 2}" ry="10" fill="#e8f6ff" opacity="${f(.38 - fr * .13)}"/>`;
   },
   platform(w) {
     const r = rng(50 + w);

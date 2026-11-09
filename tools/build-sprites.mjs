@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHARS, FRAMES, renderChar, renderBull, BULL_FRAMES, f } from './art/rig.js';
 import { MAP_ART } from './art/maps.js';
+import { SUPPLY_ART } from './art/supply.js';
 import { MAPS, PLATFORM_WIDTHS } from '../js/config.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -43,7 +44,12 @@ for (const c of CHARS) {
   };
 }
 
-const TRAP_PAD = 20, TRAP_FRAMES = 2;
+// Traps: 8 frames. Looping traps get a continuous phase 0 → 1 → 0; traps that react to someone
+// standing in them (trapReact) get 4 idle frames, then 4 shaking 'triggered' frames.
+const TRAP_PAD = 20, TRAP_FRAMES = 8;
+const trapFrame = (art, react, w, k) => react
+  ? (k < 4 ? art.trap(w, 0) : `<g transform="translate(${[-1.2, 1.2, -0.6, 0.6][k - 4]} 0)">${art.trap(w, 1)}</g>`)
+  : art.trap(w, 0.5 - 0.5 * Math.cos(Math.PI * 2 * k / TRAP_FRAMES));
 const PLAT_TOP = 4, PLAT_H = 48;
 for (const [id, art] of Object.entries(MAP_ART)) {
   write(`maps/${id}/far.svg`, svg(1280, 360, art.far()));
@@ -52,7 +58,7 @@ for (const [id, art] of Object.entries(MAP_ART)) {
   // trapTop: headroom above the ground (the library guard stands tall behind his floor)
   const tw = MAPS[id].trapWidth, cw = tw + TRAP_PAD * 2, TRAP_TOP = art.trapTop || 70, TRAP_H = TRAP_TOP + 44;
   let traps = '';
-  for (let fr = 0; fr < TRAP_FRAMES; fr++) traps += `<g transform="translate(${fr * cw + TRAP_PAD} ${TRAP_TOP})">${art.trap(tw, fr)}</g>`;
+  for (let k = 0; k < TRAP_FRAMES; k++) traps += `<g transform="translate(${k * cw + TRAP_PAD} ${TRAP_TOP})">${trapFrame(art, MAPS[id].trapReact, tw, k)}</g>`;
   write(`maps/${id}/trap.svg`, svg(cw * TRAP_FRAMES, TRAP_H, traps));
 
   const pw = Math.max(...PLATFORM_WIDTHS) + 8;
@@ -74,6 +80,18 @@ let bull = '';
 for (let i = 0; i < BULL_FRAMES; i++) bull += `<g transform="translate(${i * BULL_CELL[0] + BULL_ORIGIN[0]} ${BULL_ORIGIN[1]})">${renderBull(i)}</g>`;
 write('extras/bull.svg', svg(BULL_CELL[0] * BULL_FRAMES, BULL_CELL[1], bull));
 theme.extras = { bull: { sheet: 'extras/bull.svg', cell: BULL_CELL, origin: BULL_ORIGIN, frames: BULL_FRAMES, scale: 0.85 } };
+
+// supply drops: per map [carrier+item flap 0, flap 1, carrier alone, item alone]; origin = item bottom
+const SUP_CELL = [100, 132], SUP_ORIGIN = [50, 126], SUP_HOOK = 32;
+for (const [id, art] of Object.entries(SUPPLY_ART)) {
+  const cell = (k, body) => `<g transform="translate(${k * SUP_CELL[0] + SUP_ORIGIN[0]} ${SUP_ORIGIN[1]})">${body}</g>`;
+  const carrier = fl => `<g transform="translate(0 ${-SUP_HOOK})">${art.carrier(fl)}</g>`;
+  const rope = `<path d="M0 -26 V${-SUP_HOOK}" stroke="#18131f" stroke-width="1.6"/>`;
+  write(`extras/supply/${id}.svg`, svg(SUP_CELL[0] * 4, SUP_CELL[1],
+    cell(0, carrier(0) + rope + art.item()) + cell(1, carrier(1) + rope + art.item()) + cell(2, carrier(0)) + cell(3, art.item())));
+  theme.extras.supply ??= { cell: SUP_CELL, origin: SUP_ORIGIN, sheets: {} };
+  theme.extras.supply.sheets[id] = `extras/supply/${id}.svg`;
+}
 
 write('theme.json', JSON.stringify(theme, null, 2) + '\n');
 console.log(`theme written to ${out} (${FRAMES.length} frames per character, ${PAGES} sheet pages)`);

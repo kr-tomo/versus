@@ -126,13 +126,16 @@ export function canParry(def, s, now = def.t) {
 }
 
 // Contacts this frame. Each attack (or super hit window) connects once; it is marked used here.
+// Genghis's rush shrugs off everything but supers and air attacks.
+export const rushProof = (def, s) => !!def.rush && !s.super && !s.aerial;
+
 // A fighter running a super, or a stag beetle in its air dash, is invulnerable.
 // A `sure` super hit connects wherever the opponent is.
 export function detectHits(a, b) {
   const connects = [[a, b], [b, a]].map(([att, def]) => {
     const s = strike(att), hb = hitbox(att, s);
     return { att, def, s, hb };
-  }).filter(({ def, s, hb }) => hb && !def.ko && !def.super && (s.sure || (!dashing(def) && overlap(hb, hurtbox(def)))));
+  }).filter(({ def, s, hb }) => hb && !def.ko && !def.super && !rushProof(def, s) && (s.sure || (!dashing(def) && overlap(hb, hurtbox(def)))));
   for (const { att, s } of connects) if (s.super) att.super.done.add(s.index); else att.attack.hit = true;
   return connects.map(c => ({ ...c, x: (Math.max(c.hb.x1, c.def.x - halfW(c.def)) + Math.min(c.hb.x2, c.def.x + halfW(c.def))) / 2 }));
 }

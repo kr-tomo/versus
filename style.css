@@ -34,6 +34,16 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .pad.a-guard { --bc: #2f63b8; }
 .pad.a-jump { --bc: #2f8f4c; }
 .pad.down { transform: translateY(3px) scale(.94); box-shadow: 0 1px 0 rgba(0,0,0,.45); filter: brightness(1.35); }
+/* virtual joystick: a base ring and a knob that follows the thumb (--kx/--ky set by input.js) */
+.pad.a-stick { --bc: rgba(40,36,56,.55); background: radial-gradient(circle, rgba(255,255,255,.06) 0 55%, rgba(255,255,255,.14) 56% 58%, transparent 59%), var(--bc); }
+.pad.a-stick.down { transform: none; box-shadow: 0 4px 0 rgba(0,0,0,.45); filter: none; }
+.pad.a-stick .knob {
+  position: absolute; left: 50%; top: 50%; width: 48%; height: 48%; border-radius: 50%;
+  transform: translate(calc(-50% + var(--kx, 0px)), calc(-50% + var(--ky, 0px)));
+  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.55), rgba(255,255,255,.15) 60%), #5a5470;
+  border: 2px solid var(--ring); box-shadow: 0 3px 6px rgba(0,0,0,.4); pointer-events: none;
+}
+.pad.a-stick.down .knob { filter: brightness(1.3); }
 
 .hud-btn {
   position: absolute; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center;

@@ -40,6 +40,7 @@ export function moveList(w) {
   }
   if (st.airDash) rows.push({ kind: '2단 점프', name: '공중 돌진', input: '공중에서 ↑', note: '수평으로 날아가는 동안 공격을 받지 않음' });
   if (st.blink) rows.push({ kind: '특수 이동', name: '그림자 걸음', input: '→ → (홀드)', note: '앞으로 키 3배 거리 순간이동' });
+  if (st.rush) rows.push({ kind: '특수 이동', name: '기마 돌진', input: '→ → (홀드)', note: '앞으로 240px 질주 · 필살기와 공중 공격 말고는 맞지 않음' });
   if (st.reel) rows.push({ kind: '특수 이동', name: '갈고리 후퇴', input: '← ← (홀드)', note: '채찍을 뒤 땅에 걸고 당겨 키 2배 거리를 빠르게 후퇴' });
   rows.push({ kind: '방어', name: '막기', input: 'Ⓑ 홀드', note: '천천히 이동 가능' });
   rows.push({ kind: '방어', name: '패링', input: '맞기 직전 Ⓑ', note: '확정 0.1초 전 안에 누르면 데미지 없음 · 상대 0.2초 경직 (필살기·잡기 제외)' });

@@ -1,7 +1,7 @@
 // Gameplay constants. Visuals live in themes/<id>/theme.json.
 
 // Shown on the title screen; keep in step with CACHE in sw.js.
-export const APP_VERSION = 'v11';
+export const APP_VERSION = 'v12';
 
 export const WORLD_W = 1280;
 export const VIEW_W = 640;
@@ -41,7 +41,8 @@ export const WEAPONS = {
   dagger:  { name: '단검',     power: 8,  reach: 45,  startup: 0.09, active: 0.09, recovery: 0.16, move: 1.1,  guardUp: 0.04, blink: true },
   fist:    { name: '맨손',     power: 6,  reach: 35,  startup: 0.07, active: 0.08, recovery: 0.12, move: 1.15, guardUp: 0.03 },
   stag:    { name: '큰 턱',    power: 14, reach: 85,  startup: 0.17, active: 0.10, recovery: 0.26, move: 1.0,  guardUp: 0.08, airDash: true },
-  genghis: { name: '청룡언월도', power: 22, reach: 140, startup: 0.36, active: 0.13, recovery: 0.46, move: 0.85, guardUp: 0.17, halfW: 26, height: 110 },
+  // rush: forward double-tap + hold charges the horse ahead (see RUSH_*)
+  genghis: { name: '청룡언월도', power: 22, reach: 140, startup: 0.36, active: 0.13, recovery: 0.46, move: 0.85, guardUp: 0.17, halfW: 26, height: 110, rush: true },
   // longArmor: the forward attack also keeps swinging through hits
   mace:    { name: '철퇴',     power: 18, reach: 92,  startup: 0.30, active: 0.12, recovery: 0.40, move: 0.88, guardUp: 0.13, longArmor: true, heavyReach: 1 },
   fork:    { name: '갈퀴',     power: 10, reach: 110, startup: 0.18, active: 0.10, recovery: 0.27, move: 1.0,  guardUp: 0.09 },
@@ -90,6 +91,20 @@ export const AIR_LASH_REACH = 1.5;
 export const REEL_DIST = 2;
 export const REEL_TIME = 0.2;
 export const REEL_COOLDOWN = 0.5;
+// Genghis rush: forward double-tap + hold gallops the dagger's blink distance (3 x the standard body
+// height = 240px) over RUSH_TIME. No damage of its own; while rushing only supers and air attacks hurt.
+export const RUSH_TIME = 0.3;
+export const RUSH_COOLDOWN = 0.6;
+
+// Recovery mode (supply drops). 'on': every SUPPLY_EVERY seconds a carrier lowers an item that heals
+// SUPPLY_HEAL of max energy at a random spot in view; 'x2': every second drop is a big one (SUPPLY_BIG).
+// Items land on platforms or the ground, blink for SUPPLY_LINGER seconds and vanish.
+export const SUPPLY_MODES = ['off', 'on', 'x2'];
+export const SUPPLY_EVERY = 20;
+export const SUPPLY_HEAL = 0.1;
+export const SUPPLY_BIG = 0.2;
+export const SUPPLY_FALL = 75;         // px/s under the carrier
+export const SUPPLY_LINGER = 2;
 // Dagger blink: two taps of forward within BLINK_TAP, the second held BLINK_HOLD, jumps 3 body heights.
 export const BLINK_TAP = 0.25;
 export const BLINK_HOLD = 0.1;
@@ -153,7 +168,9 @@ const rapid = (n, from, step, hit) => Array.from({ length: n }, (_, i) => ({ at:
 export const SUPERS = {
   sword: { name: '성검 십자참', time: 0.8, range: 110, dash: [[0.12, 0.5, 360]],
     hits: [{ at: 0.18, len: 0.12, reach: 90, dmg: 16, kb: 20, stun: 0.4 }, { at: 0.48, len: 0.12, reach: 105, dmg: 22, kb: 140, stun: 0.6 }] },
-  spear: { name: '일섬 돌격', time: 0.85, range: 260, dash: [[0.2, 0.65, 600]],
+  // 1.5x the old distance (270 → 405px), climbing at a slant to 0.8 body heights by the end:
+  // dash entries are [from, to, speed, rise]
+  spear: { name: '일섬 돌격', time: 0.95, range: 360, dash: [[0.2, 0.65, 900, 0.8]],
     hits: [{ at: 0.2, len: 0.45, reach: 115, dmg: 34, kb: 220, stun: 0.7 }] },
   axe: { name: '대지 분쇄', time: 1.05, range: 180, dash: [[0.42, 0.5, 200]],
     hits: [{ at: 0.5, len: 0.12, reach: 190, dmg: 40, kb: 170, stun: 0.8, ub: true }], quake: 0.5 },
