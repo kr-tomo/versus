@@ -22,30 +22,17 @@ function fight(w1, w2, extra = {}) {
   return g;
 }
 
-test('touch: each touch player gets a joystick (no ◀ ▶) plus attack, guard and jump', () => {
-  for (const [Wd, H] of [[844, 390], [1180, 820], [1920, 1080]]) for (const players of [1, 2]) {
+test('touch: each touch player gets a D-pad plus attack and guard (no jump button, no ◀ ▶)', () => {
+  for (const [Wd, H] of [[844, 390], [1180, 820], [1920, 1080], [390, 844]]) for (const players of [1, 2]) {
     const L = computeLayout(Wd, H, { players });
-    for (let p = 0; p < players; p++) {
-      const mine = L.buttons.filter(b => b.player === p).map(b => b.action).sort();
-      if (players === 1) assert.deepEqual(mine, ['attack', 'guard', 'jump', 'stick']);
-      else assert.deepEqual(mine, ['attack', 'guard', 'jump', 'stick']);
-    }
-    assert.ok(!L.buttons.some(b => b.action === 'left' || b.action === 'right'));
+    for (let p = 0; p < players; p++) assert.deepEqual(L.buttons.filter(b => b.player === p).map(b => b.action).sort(), ['attack', 'dpad', 'guard']);
   }
 });
 
-test('touch: the joystick walks, jumps and drops; a slide across buttons holds both', async () => {
+test('touch: a slide across action buttons holds both', async () => {
   globalThis.addEventListener ??= () => {};
   const { InputManager } = await import('../js/input.js');
   const im = new InputManager();
-  const stick = (dx, dy) => { im.sticks.clear(); im.sticks.set(1, { player: 0, dx, dy }); return im.read(0); };
-  assert.ok(stick(-0.8, 0).left && !stick(-0.8, 0).jump);
-  assert.ok(stick(0.9, 0.1).right);
-  assert.ok(stick(0, -0.9).jump);
-  assert.ok(stick(0, 0.9).down, 'pull down = drop through a platform');
-  assert.ok(!Object.values(stick(0.1, 0.1)).some(Boolean), 'dead zone');
-  im.sticks.clear();
-  // finger pressed attack, then slid onto guard: both count
   im.pointers.set(7, { player: 0, actions: new Set(['attack', 'guard']) });
   const s = im.read(0);
   assert.ok(s.attack && s.guard);

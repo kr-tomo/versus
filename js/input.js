@@ -1,7 +1,28 @@
 // Touch buttons, keyboard and gamepads merged into per-player input.
 
-// Joystick thresholds (fraction of its radius): walking reacts early, jump/drop need a firm push.
-const STICK_X = 0.35, STICK_Y = 0.6;
+// Touch D-pad, after RetroArch's overlay dpad_area (input_driver.c, input_overlay_get_eightway_state):
+// the diagonal sensitivity is the size of a diagonal zone relative to a cardinal one; 100% gives
+// 8 equal 45° zones. At 80% each diagonal spans 40° and each cardinal 50° (boundaries 25° / 65°).
+export const DPAD_DIAGONAL = 80;
+export const DPAD_RANGE_MOD = 1.5;     // hitbox growth while held (RetroArch range_mod)
+export const HAPTIC_MS = 12;           // attack/guard tick with one player on touch
+const NO_DIRS = Object.freeze({ up: false, down: false, left: false, right: false });
+
+export function dpadSlopes(sensitivity = DPAD_DIAGONAL) {
+  const f = 2 * sensitivity / (100 + sensitivity);
+  const high = f * (0.375 * Math.PI) + (1 - f) * (0.25 * Math.PI);
+  const low = f * (0.125 * Math.PI) + (1 - f) * (0.25 * Math.PI);
+  return { low: Math.tan(low), high: Math.tan(high) };
+}
+const SLOPES = dpadSlopes();
+
+// (dx, dy) from the D-pad center (y down) → pressed directions; any offset picks a zone (no dead zone)
+export function dpadDirs(dx, dy, { low, high } = SLOPES) {
+  const ax = Math.abs(dx), ay = Math.abs(dy);
+  if (!ax && !ay) return NO_DIRS;
+  const vert = ay > low * ax, horiz = ay < high * ax;
+  return { up: vert && dy < 0, down: vert && dy > 0, left: horiz && dx < 0, right: horiz && dx > 0 };
+}
 
 const blank = () => ({ left: false, right: false, jump: false, down: false, attack: false, guard: false });
 
@@ -37,20 +58,27 @@ const GAME_KEYS = new Set(KEYMAP.flatMap(Object.keys));
 export class InputManager {
   constructor() {
     this.pointers = new Map(); // pointerId → { player, actions: Set } (buttons touched during the stroke)
-    this.sticks = new Map();   // pointerId → { player, el, dx, dy } (virtual joystick, -1..1)
+    this.dpads = new Map();    // pointerId → { player, el, on, dirs } (touch D-pad)
     this.keys = new Set();
     this.players = 2;
     this.onPadsChanged = () => {};
     this.padCount = 0;
     addEventListener('keydown', e => { if (GAME_KEYS.has(e.code)) { this.keys.add(e.code); e.preventDefault(); } });
     addEventListener('keyup', e => this.keys.delete(e.code));
-    addEventListener('blur', () => { this.keys.clear(); this.pointers.clear(); this.sticks.clear(); });
+    addEventListener('blur', () => { this.keys.clear(); this.pointers.clear(); this.dpads.clear(); });
     addEventListener('gamepadconnected', () => this.pollPads());
     addEventListener('gamepaddisconnected', () => this.pollPads());
   }
 
-  // Touch controls. The joystick follows its finger anywhere until release. A finger that slides
-  // from one button onto another of the same player keeps both pressed (attack → guard = both).
+  // Touch controls, modelled on RetroArch's overlay D-pad (dpad_area):
+  // - one cross-shaped area; the direction comes from the angle of the finger from its center,
+  //   8-way with diagonal zones sized by DPAD_DIAGONAL (RetroArch default 80%)
+  // - the press must start inside the drawn area; while held the hitbox grows by DPAD_RANGE_MOD
+  //   (RetroArch range_mod) so the thumb can roll around without slipping off; leaving even that
+  //   releases it, and coming back into the drawn area presses again
+  // - the finger slides between directions freely; no dynamic recentering
+  // A finger that slides from one action button onto another of the same player keeps both pressed
+  // (attack → guard = both). With one player on touch, attack/guard give a short haptic tick.
   bindTouch(layer) {
     const hit = (x, y) => {
       const el = document.elementFromPoint(x, y)?.closest('[data-action]');
@@ -58,37 +86,43 @@ export class InputManager {
     };
     const aim = (st, e) => {
       const r = st.el.getBoundingClientRect(), R = r.width / 2;
-      let dx = (e.clientX - r.left - R) / R, dy = (e.clientY - r.top - R) / R;
-      const len = Math.hypot(dx, dy);
-      if (len > 1) { dx /= len; dy /= len; }
-      st.dx = dx; st.dy = dy;
-      st.el.style.setProperty('--kx', `${(dx * R * 0.55).toFixed(1)}px`);
-      st.el.style.setProperty('--ky', `${(dy * R * 0.55).toFixed(1)}px`);
+      const dx = (e.clientX - r.left - R) / R, dy = (e.clientY - r.top - R) / R;
+      const reach = st.on ? DPAD_RANGE_MOD : 1;
+      st.on = Math.abs(dx) <= reach && Math.abs(dy) <= reach;
+      st.dirs = st.on ? dpadDirs(dx, dy) : NO_DIRS;
+      st.el.dataset.dirs = Object.keys(st.dirs).filter(k => st.dirs[k]).join(' ');
+    };
+    const tick = (player, action) => {
+      if (this.players === 1 && (action === 'attack' || action === 'guard')) navigator.vibrate?.(HAPTIC_MS);
     };
     layer.addEventListener('pointerdown', e => {
       e.preventDefault();
       const el = hit(e.clientX, e.clientY);
       if (!el) return;
       try { el.setPointerCapture(e.pointerId); } catch { /* not supported */ }
-      if (el.dataset.action === 'stick') {
-        const st = { player: +el.dataset.player, el, dx: 0, dy: 0 };
-        this.sticks.set(e.pointerId, st);
+      if (el.dataset.action === 'dpad') {
+        const st = { player: +el.dataset.player, el, on: false, dirs: NO_DIRS };
+        this.dpads.set(e.pointerId, st);
         aim(st, e);
-      } else this.pointers.set(e.pointerId, { player: +el.dataset.player, actions: new Set([el.dataset.action]) });
+      } else {
+        this.pointers.set(e.pointerId, { player: +el.dataset.player, actions: new Set([el.dataset.action]) });
+        tick(+el.dataset.player, el.dataset.action);
+      }
       this.refreshPressed(layer);
     });
     layer.addEventListener('pointermove', e => {
-      const st = this.sticks.get(e.pointerId);
-      if (st) { aim(st, e); return; }
+      const st = this.dpads.get(e.pointerId);
+      if (st) { aim(st, e); this.refreshPressed(layer); return; }
       const p = this.pointers.get(e.pointerId), el = p && hit(e.clientX, e.clientY);
-      if (el && el.dataset.action !== 'stick' && +el.dataset.player === p.player && !p.actions.has(el.dataset.action)) {
+      if (el && el.dataset.action !== 'dpad' && +el.dataset.player === p.player && !p.actions.has(el.dataset.action)) {
         p.actions.add(el.dataset.action);
+        tick(p.player, el.dataset.action);
         this.refreshPressed(layer);
       }
     });
     const end = e => {
-      const st = this.sticks.get(e.pointerId);
-      if (st) { st.el.style.setProperty('--kx', '0px'); st.el.style.setProperty('--ky', '0px'); this.sticks.delete(e.pointerId); }
+      const st = this.dpads.get(e.pointerId);
+      if (st) { st.el.dataset.dirs = ''; this.dpads.delete(e.pointerId); }
       this.pointers.delete(e.pointerId);
       this.refreshPressed(layer);
     };
@@ -97,7 +131,7 @@ export class InputManager {
 
   refreshPressed(layer) {
     const on = new Set([...this.pointers.values()].flatMap(p => [...p.actions].map(a => `${p.player}:${a}`)));
-    for (const st of this.sticks.values()) on.add(`${st.player}:stick`);
+    for (const st of this.dpads.values()) if (st.on) on.add(`${st.player}:dpad`);
     for (const el of layer.querySelectorAll('[data-action]')) el.classList.toggle('down', on.has(`${el.dataset.player}:${el.dataset.action}`));
   }
 
@@ -118,10 +152,9 @@ export class InputManager {
   read(player) {
     const s = blank();
     for (const p of this.pointers.values()) if (p.player === player) for (const a of p.actions) s[a] = true;
-    // joystick: sideways walks, up jumps, down drops through a platform
-    for (const st of this.sticks.values()) if (st.player === player) {
-      s.left ||= st.dx < -STICK_X; s.right ||= st.dx > STICK_X;
-      s.jump ||= st.dy < -STICK_Y; s.down ||= st.dy > STICK_Y;
+    // D-pad: ◀ ▶ walk, ▲ jumps (diagonals jump while moving), ▼ drops through a platform
+    for (const st of this.dpads.values()) if (st.player === player) {
+      s.left ||= st.dirs.left; s.right ||= st.dirs.right; s.jump ||= st.dirs.up; s.down ||= st.dirs.down;
     }
     const maps = this.players === 1 ? KEYMAP : [KEYMAP[player]];
     for (const map of maps) for (const [code, action] of Object.entries(map)) if (this.keys.has(code)) s[action] = true;

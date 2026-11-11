@@ -34,16 +34,21 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .pad.a-guard { --bc: #2f63b8; }
 .pad.a-jump { --bc: #2f8f4c; }
 .pad.down { transform: translateY(3px) scale(.94); box-shadow: 0 1px 0 rgba(0,0,0,.45); filter: brightness(1.35); }
-/* virtual joystick: a base ring and a knob that follows the thumb (--kx/--ky set by input.js) */
-.pad.a-stick { --bc: rgba(40,36,56,.55); background: radial-gradient(circle, rgba(255,255,255,.06) 0 55%, rgba(255,255,255,.14) 56% 58%, transparent 59%), var(--bc); }
-.pad.a-stick.down { transform: none; box-shadow: 0 4px 0 rgba(0,0,0,.45); filter: none; }
-.pad.a-stick .knob {
-  position: absolute; left: 50%; top: 50%; width: 48%; height: 48%; border-radius: 50%;
-  transform: translate(calc(-50% + var(--kx, 0px)), calc(-50% + var(--ky, 0px)));
-  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.55), rgba(255,255,255,.15) 60%), #5a5470;
-  border: 2px solid var(--ring); box-shadow: 0 3px 6px rgba(0,0,0,.4); pointer-events: none;
+/* touch D-pad: a cross with four arms; the pressed arms light up (RetroArch alpha_mod 2.0 style) */
+.pad.a-dpad { border-radius: 0; border: 0; background: none; box-shadow: none; }
+.pad.a-dpad.down { transform: none; filter: none; box-shadow: none; }
+.pad.a-dpad .arm, .pad.a-dpad .hub {
+  position: absolute; display: flex; align-items: center; justify-content: center; font-size: .62em; color: rgba(255,255,255,.75);
+  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.18), rgba(255,255,255,.03) 70%), #3b3650;
+  border: 2px solid var(--ring); box-shadow: 0 4px 0 rgba(0,0,0,.45); pointer-events: none;
 }
-.pad.a-stick.down .knob { filter: brightness(1.3); }
+.pad.a-dpad .arm.u { left: 33%; top: 0; width: 34%; height: 38%; border-radius: 8px 8px 0 0; border-bottom: 0; }
+.pad.a-dpad .arm.d { left: 33%; bottom: 0; width: 34%; height: 38%; border-radius: 0 0 8px 8px; border-top: 0; }
+.pad.a-dpad .arm.l { top: 33%; left: 0; width: 38%; height: 34%; border-radius: 8px 0 0 8px; border-right: 0; }
+.pad.a-dpad .arm.r { top: 33%; right: 0; width: 38%; height: 34%; border-radius: 0 8px 8px 0; border-left: 0; }
+.pad.a-dpad .hub { left: 33%; top: 33%; width: 34%; height: 34%; border: 0; box-shadow: none; border-radius: 0; }
+.pad.a-dpad[data-dirs~="up"] .arm.u, .pad.a-dpad[data-dirs~="down"] .arm.d,
+.pad.a-dpad[data-dirs~="left"] .arm.l, .pad.a-dpad[data-dirs~="right"] .arm.r { filter: brightness(1.9); color: #fff; transform: scale(.96); }
 
 .hud-btn {
   position: absolute; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center;

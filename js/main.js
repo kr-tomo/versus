@@ -10,7 +10,8 @@ import { moveList } from './moves.js';
 
 const $ = s => document.querySelector(s);
 const stageEl = $('#stage'), controls = $('#controls'), pauseBtn = $('#pauseBtn'), exitBtn = $('#exitBtn'), hints = $('#hints');
-const LABEL = { attack: '공격', guard: '방어', jump: '점프' };
+const LABEL = { attack: '공격', guard: '방어' };
+const DPAD_HTML = '<i class="arm u">▲</i><i class="arm d">▼</i><i class="arm l">◀</i><i class="arm r">▶</i><i class="hub"></i>';
 const MODE_LABEL = { '2p': '2인 대전', easy: '컴퓨터 · 쉬움', hard: '컴퓨터 · 어려움' };
 // default focus and the B button for each activeScreen
 const SCREENS = {
@@ -319,13 +320,13 @@ function onResize() {
   Object.assign(stageEl.style, { left: `${il + v.x}px`, top: `${it + v.y}px`, width: `${v.w}px`, height: `${v.h}px` });
   try { stage.resize(Math.round(v.w * dpr), Math.round(v.h * dpr)); } catch (e) { report('resize', e); }
   controls.innerHTML = layout.buttons.map(b =>
-    `<div class="pad p${b.player} a-${b.action}" data-player="${b.player}" data-action="${b.action}" style="left:${il + b.x - b.r}px;top:${it + b.y - b.r}px;width:${b.r * 2}px;height:${b.r * 2}px;font-size:${Math.round(b.r * 0.5)}px">${b.action === 'stick' ? '<i class="knob"></i>' : LABEL[b.action]}</div>`).join('');
+    `<div class="pad p${b.player} a-${b.action}" data-player="${b.player}" data-action="${b.action}" style="left:${il + b.x - b.r}px;top:${it + b.y - b.r}px;width:${b.r * 2}px;height:${b.r * 2}px;font-size:${Math.round(b.r * 0.5)}px">${b.action === 'dpad' ? DPAD_HTML : LABEL[b.action]}</div>`).join('');
   // pause and exit sit under the round timer, between the two super gauges
   const ps = Math.round(Math.max(30, v.h * 0.085)), gap = Math.round(ps * 0.2), top = it + v.y + v.h * (46 / 360);
   Object.assign(pauseBtn.style, { left: `${il + v.x + v.w / 2 - ps - gap / 2}px`, top: `${top}px`, width: `${ps}px`, height: `${ps}px`, fontSize: `${ps * 0.42}px` });
   Object.assign(exitBtn.style, { left: `${il + v.x + v.w / 2 + gap / 2}px`, top: `${top}px`, width: `${ps}px`, height: `${ps}px`, fontSize: `${ps * 0.42}px` });
   // fingers resting on buttons that just went away must not stay pressed
-  input.pointers.clear(); input.sticks.clear();
+  input.pointers.clear(); input.dpads.clear();
   updateHints();
 }
 

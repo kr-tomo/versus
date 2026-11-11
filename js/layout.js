@@ -7,7 +7,7 @@ export const ASPECT = 16 / 9;
 export const SIDE_MIN_RATIO = 0.75;
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-const ACTIONS = ['attack', 'guard', 'jump'];
+const ACTIONS = ['attack', 'guard']; // jump is ↑ on the D-pad
 
 function metrics(W, H) {
   const btn = Math.round(clamp(Math.min(W, H) * 0.13, 44, 84));
@@ -16,26 +16,26 @@ function metrics(W, H) {
   return { btn, gap, margin, sep: Math.round(btn * 0.6) };
 }
 
-// Virtual joystick radius in the side gutter (fits the old two-button row).
-const stickR = m => m.btn * 0.95;
+// D-pad half size in the side gutter (fits the old two-button row).
+const padR = m => m.btn * 0.95;
 
-// 2 columns: [jump] / [attack guard] / (gap) / [joystick], bottom aligned
+// 2 columns: [attack guard] / (gap) / [D-pad], bottom aligned
 function sideCluster(cx, bottom, m, player, parts) {
-  const { btn, gap } = m, r = btn / 2, dx = (btn + gap) / 2, rs = stickR(m);
-  const yStick = bottom - rs, yAct = yStick - rs - gap - r, yJump = yAct - btn - gap;
+  const { btn, gap } = m, r = btn / 2, dx = (btn + gap) / 2, rs = padR(m);
+  const yPad = bottom - rs, yAct = yPad - rs - gap - r;
   const out = [];
-  if (parts.includes('move')) out.push({ player, action: 'stick', x: cx, y: yStick, r: rs });
+  if (parts.includes('move')) out.push({ player, action: 'dpad', x: cx, y: yPad, r: rs });
   if (parts.includes('act')) {
-    // with no joystick below, the actions drop to the bottom for the thumb
+    // with no D-pad below, the actions drop to the bottom for the thumb
     const shift = parts.includes('move') ? 0 : bottom - r - yAct;
-    out.push({ player, action: 'attack', x: cx - dx, y: yAct + shift, r }, { player, action: 'guard', x: cx + dx, y: yAct + shift, r }, { player, action: 'jump', x: cx, y: yJump + shift, r });
+    out.push({ player, action: 'attack', x: cx - dx, y: yAct + shift, r }, { player, action: 'guard', x: cx + dx, y: yAct + shift, r });
   }
   return out;
 }
 
 function sideLayout(W, H, players, m) {
   const gutter = 2 * m.btn + m.gap + 2 * m.margin;
-  const clusterH = 2 * stickR(m) + 2 * m.btn + 2 * m.gap + 2 * m.margin;
+  const clusterH = 2 * padR(m) + m.btn + m.gap + 2 * m.margin;
   const vw = Math.min(W - 2 * gutter, H * ASPECT);
   if (vw <= 0 || clusterH > H) return null;
   const vh = vw / ASPECT;
@@ -51,21 +51,21 @@ function row(x0, y, m, player, actions) {
   return actions.map((action, i) => ({ player, action, x: x0 + m.btn / 2 + i * (m.btn + m.gap), y, r: m.btn / 2 }));
 }
 
-// The joystick takes the two slots the ◀ ▶ buttons used; under the view it is limited by the row height.
-function stickSlot(x0, y, m, player) {
-  return { player, action: 'stick', x: x0 + m.btn + m.gap / 2, y, r: Math.min(m.btn + m.gap / 2, m.btn / 2 + m.margin * 0.8) };
+// The D-pad takes the two slots the ◀ ▶ buttons used; under the view it is limited by the row height.
+function padSlot(x0, y, m, player) {
+  return { player, action: 'dpad', x: x0 + m.btn + m.gap / 2, y, r: Math.min(m.btn + m.gap / 2, m.btn / 2 + m.margin * 0.8) };
 }
 
 function bottomLayout(W, H, players, m0) {
   let m = { ...m0 };
   const half = players === 2 ? W / 2 - m.margin * 1.5 : W - m.margin * 2;
-  const wide = mm => 5 * mm.btn + 3 * mm.gap + mm.sep;
+  const wide = mm => 4 * mm.btn + 2 * mm.gap + mm.sep;
   let twoRows = false;
   if (players === 2 && wide(m) > half) {
     twoRows = true;
-    const narrow = 3 * m.btn + 2 * m.gap;
+    const narrow = 2 * m.btn + m.gap;
     if (narrow > half) {
-      const btn = Math.floor((half) / (3 + 2 * 0.22));
+      const btn = Math.floor(half / (2 + 0.22));
       m = { ...m, btn, gap: Math.round(btn * 0.22), sep: Math.round(btn * 0.6) };
     }
   }
@@ -74,20 +74,20 @@ function bottomLayout(W, H, players, m0) {
   const view = { x: (W - vw) / 2, y: (H - ch - vh) / 2, w: vw, h: vh };
   const yB = H - m.margin - m.btn / 2, yT = yB - m.btn - m.gap;
   const buttons = [];
-  const clusterW = twoRows ? 3 * m.btn + 2 * m.gap : wide(m);
+  const clusterW = twoRows ? 2 * m.btn + m.gap : wide(m);
   const cluster = (x0, player) => {
     if (twoRows) {
       buttons.push(...row(x0, yT, m, player, ACTIONS));
-      buttons.push(stickSlot(x0 + (m.btn + m.gap) / 2, yB, m, player));
+      buttons.push(padSlot(x0, yB, m, player));
     } else {
-      buttons.push(stickSlot(x0, yB, m, player));
+      buttons.push(padSlot(x0, yB, m, player));
       buttons.push(...row(x0 + 2 * (m.btn + m.gap) - m.gap + m.sep, yB, m, player, ACTIONS));
     }
   };
   if (players === 2) { cluster(m.margin, 0); cluster(W - m.margin - clusterW, 1); }
   else {
-    buttons.push(stickSlot(m.margin, yB, m, 0));
-    buttons.push(...row(W - m.margin - (3 * m.btn + 2 * m.gap), yB, m, 0, ACTIONS));
+    buttons.push(padSlot(m.margin, yB, m, 0));
+    buttons.push(...row(W - m.margin - (2 * m.btn + m.gap), yB, m, 0, ACTIONS));
   }
   return { mode: 'bottom', view, btn: m.btn, buttons };
 }

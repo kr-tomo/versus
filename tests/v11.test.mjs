@@ -280,8 +280,8 @@ test('layout: touch buttons only for players that need them; none → the view f
   const both = computeLayout(1280, 720, { players: 2 });
   const p2only = computeLayout(1280, 720, { players: 2, touch: [1] });
   const none = computeLayout(1280, 720, { players: 2, touch: [] });
-  assert.equal(both.buttons.length, 8);   // per player: joystick + 3 buttons
-  assert.equal(p2only.buttons.length, 4);
+  assert.equal(both.buttons.length, 6);   // per player: D-pad + attack + guard
+  assert.equal(p2only.buttons.length, 3);
   assert.ok(p2only.buttons.every(b => b.player === 1));
   assert.equal(none.buttons.length, 0);
   assert.ok(none.view.w > p2only.view.w && p2only.view.w >= both.view.w);

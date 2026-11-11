@@ -1,7 +1,7 @@
 // Gameplay constants. Visuals live in themes/<id>/theme.json.
 
 // Shown on the title screen; keep in step with CACHE in sw.js.
-export const APP_VERSION = 'v12';
+export const APP_VERSION = 'v13';
 
 export const WORLD_W = 1280;
 export const VIEW_W = 640;

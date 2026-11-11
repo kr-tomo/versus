@@ -23,7 +23,7 @@ test('layout: 16:9 view, buttons on screen, no overlap with view or each other',
       assert.ok(!(inX && inY), `${tag} ${b.action} overlaps view`);
     }
     L.buttons.forEach((a, i) => L.buttons.slice(i + 1).forEach(b => assert.ok(Math.hypot(a.x - b.x, a.y - b.y) >= a.r + b.r - 0.5, `${tag} ${a.action}/${b.action} overlap`)));
-    assert.equal(L.buttons.length, players * 4, tag); // joystick + attack, guard, jump
+    assert.equal(L.buttons.length, players * 3, tag); // D-pad + attack, guard
   }
 });
 
