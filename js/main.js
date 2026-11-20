@@ -318,6 +318,7 @@ function onResize() {
   const layout = computeLayout(W, H, { players: input.players, touch });
   const v = layout.view, dpr = Math.min(devicePixelRatio || 1, 3);
   Object.assign(stageEl.style, { left: `${il + v.x}px`, top: `${it + v.y}px`, width: `${v.w}px`, height: `${v.h}px` });
+  controls.classList.toggle('overlay', layout.mode === 'side');   // side clusters may ride over the view's edge
   try { stage.resize(Math.round(v.w * dpr), Math.round(v.h * dpr)); } catch (e) { report('resize', e); }
   controls.innerHTML = layout.buttons.map(b =>
     `<div class="pad p${b.player} a-${b.action}" data-player="${b.player}" data-action="${b.action}" style="left:${il + b.x - b.r}px;top:${it + b.y - b.r}px;width:${b.r * 2}px;height:${b.r * 2}px;font-size:${Math.round(b.r * 0.5)}px">${b.action === 'dpad' ? DPAD_HTML : LABEL[b.action]}</div>`).join('');

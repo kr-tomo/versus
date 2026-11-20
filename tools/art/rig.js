@@ -108,6 +108,13 @@ const BOW = drawn => `
          <path d="M-28 0 l-5 -4 M-28 0 l-5 4 M-24 0 l-5 -4 M-24 0 l-5 4" stroke="#d0262e" stroke-width="1.6"/>`
       : `<line x1="1" y1="-35" x2="1" y2="35" stroke="#efe6cf" stroke-width="1.3"/>`}`;
 
+// Heater shield on the back forearm (local: strap at origin, face toward +x, seen three-quarter on).
+const SHIELD = () => `
+    <path d="M4 -22 Q16 -22 16 -8 Q16 10 4 21 Q-8 10 -8 -8 Q-8 -22 4 -22 Z" fill="#c3cad2" stroke="${OL}" stroke-width="2.6" stroke-linejoin="round"/>
+    <path d="M4 -19 Q13 -19 13 -8 Q13 7 4 17 Q-5 7 -5 -8 Q-5 -19 4 -19 Z" fill="none" stroke="#e8edf2" stroke-width="1.4"/>
+    <path d="M2 -14 h4 v5 h5 v4 h-5 v10 h-4 v-10 h-5 v-4 h5 z" fill="#b3242c"/>
+    <circle cx="4" cy="-8" r="1.2" fill="#8a929b"/><circle cx="4" cy="12" r="1.2" fill="#8a929b"/>`;
+
 // Single-action revolver, held level in the front hand; cocked = hammer back before the shot.
 const REVOLVER = cocked => `
     <path d="M-2 -2 L-8 10 Q-9 13 -5 13 L0 13 L3 3 Z" fill="#6b3a1e" stroke="${OL}" stroke-width="1.6" stroke-linejoin="round"/>
@@ -156,7 +163,13 @@ const DERIVED = {
   airLash:   { from: ['jumpAtk', 'jumpAtk', 0], set: { lean: 12, tilt: 6, fTh: 72, fSh: -12, bTh: 26, bSh: -56, fUp: 62, fFo: 48, bUp: -40, bFo: 10, w: 45, wB: 40 } },
   // bow frames (only the archer swaps in the bow; the rest render them like an extended guard)
   bowDraw:   { from: ['idle0', 'idle0', 0], add: { lean: -3 }, set: { fUp: 90, fFo: 92, bUp: 72, bFo: -48, w: 0, wB: 0, fTh: 34, fSh: 0, bTh: -24, bSh: -14 } },
-  bowShot:   { from: ['idle0', 'idle0', 0], add: { lean: -1 }, set: { fUp: 90, fFo: 92, bUp: 35, bFo: -95, w: 0, wB: 0, fTh: 34, fSh: 0, bTh: -24, bSh: -14 } }
+  bowShot:   { from: ['idle0', 'idle0', 0], add: { lean: -1 }, set: { fUp: 90, fFo: 92, bUp: 35, bFo: -95, w: 0, wB: 0, fTh: 34, fSh: 0, bTh: -24, bSh: -14 } },
+  // the archer's air shot: hanging in the air, the bow aimed 45° down-forward (legs tucked)
+  airDraw:   { from: ['bowDraw', 'bowDraw', 0], add: { lean: 8 }, set: { fUp: 48, fFo: 50, bUp: 30, bFo: -90, w: 45, fTh: 70, fSh: -10, bTh: 20, bSh: -45 } },
+  airShot:   { from: ['bowShot', 'bowShot', 0], add: { lean: 6 }, set: { fUp: 48, fFo: 50, bUp: -5, bFo: -135, w: 45, fTh: 70, fSh: -10, bTh: 20, bSh: -45 } },
+  // the sword's shield bash: shield arm thrust forward, blade raised behind, legs striding
+  bash:      { from: ['guard', 'guard', 0], add: { lean: 10, tilt: 2 }, set: { fUp: 150, fFo: 205, w: -155, fTh: 40, fSh: 15, bTh: -30, bSh: -25 } },
+  bash1:     { from: ['bash', 'bash', 0], set: { fTh: -25, fSh: -20, bTh: 35, bSh: 12 } }
 };
 
 // Sprite frames: key poses and named in-betweens [name, from, to, mix]. Every motion is a chain of
@@ -172,7 +185,7 @@ const BASE_FRAMES = [
   ['longWind'], ['longAtk0', 'longWind', 'longAtk', 0.5], ['longAtk'],
   ['heavyWind'], ['heavyAtk0', 'heavyWind', 'heavyAtk', 0.5], ['heavyAtk'],
   ['flip'], ['dive'], ['chargeHold'], ['airDash'], ['chargeAtk'], ['bowDraw'], ['bowShot'],
-  ['backTurn'], ['backKick'], ['airLash']
+  ['backTurn'], ['backKick'], ['airLash'], ['airDraw'], ['airShot'], ['bash'], ['bash1']
 ];
 export const MOTION_CHAINS = [
   ['idle0', 'idle01', 'idle1', 'idle10', 'idle0'],
@@ -187,7 +200,9 @@ export const MOTION_CHAINS = [
   ['idle0', 'chargeHold', 'chargeAtk', 'attack1'],
   ['idle0', 'bowDraw', 'bowShot', 'idle0'],
   ['chargeHold', 'backTurn', 'backKick'], ['backKick', 'backTurn', 'idle0'],
-  ['jump', 'airLash', 'fall']
+  ['jump', 'airLash', 'fall'],
+  ['jump', 'airDraw', 'airShot', 'fall'],
+  ['guard', 'bash', 'bash1', 'bash']
 ];
 const FRAME_DEFS = [...BASE_FRAMES];
 for (const chain of MOTION_CHAINS) for (let i = 0; i < chain.length - 1; i++) {
@@ -221,7 +236,8 @@ const HORSE_POSES = {
 const HORSE_FOR = {
   idle0: 'stand', idle1: 'stand', guard: 'stand', airGuard: 'tuck', jump: 'tuck', fall: 'tuck', jumpAtk: 'tuck', win: 'rear',
   longWind: 'windup', longAtk: 'attack', heavyWind: 'rear', heavyAtk: 'attack', flip: 'tuck', dive: 'tuck', chargeHold: 'windup',
-  airDash: 'tuck', chargeAtk: 'attack', bowDraw: 'stand', bowShot: 'stand', backTurn: 'windup', backKick: 'attack', airLash: 'tuck'
+  airDash: 'tuck', chargeAtk: 'attack', bowDraw: 'stand', bowShot: 'stand', backTurn: 'windup', backKick: 'attack', airLash: 'tuck',
+  airDraw: 'tuck', airShot: 'tuck', bash: 'walk0', bash1: 'walk2'
 };
 const horseKey = name => HORSE_POSES[HORSE_FOR[name] || name] || HORSE_POSES.stand;
 // in-between frames blend the horse legs of their two source frames
@@ -264,7 +280,12 @@ function renderHorse(name, rider) {
 export const CHARS = [
   {
     id: 'sword', name: '알드릭', en: 'Sir Aldric', weaponName: '칼', origin: '잉글랜드 십자군 기사',
-    accent: '#c23b3b', skin: '#f1c9a5', body: '#ece6d8', sleeve: '#a7afb8', fore: '#8a929b', pants: '#8f97a0', shin: '#4b5058', cape: '#a3232b',
+    accent: '#c23b3b', skin: '#f1c9a5', body: '#ece6d8', sleeve: '#a7afb8', fore: '#8a929b', pants: '#8f97a0', shin: '#4b5058', cape: '#a3232b', shield: true,
+    // the shield arm comes forward to block; the blade stays up behind it
+    poses: {
+      guard: { w: -70, fUp: 20, fFo: 160, bUp: 72, bFo: 96 }, airGuard: { w: -70, fUp: 20, fFo: 160, bUp: 72, bFo: 96 },
+      bash: { bUp: 78, bFo: 98 }, bash1: { bUp: 78, bFo: 98 }
+    },
     torso: c => `<path d="M-10 0 L10 0 L13 13 L-12 13 Z" fill="${c.body}" stroke="${OL}" stroke-width="2.5" stroke-linejoin="round"/>
       <path d="M-10 1 L10 1 L12 -27 Q0 -33 -12 -27 Z" fill="${c.body}" stroke="${OL}" stroke-width="3" stroke-linejoin="round"/>
       <path d="M-2 -24 h4 v7 h7 v4 h-7 v10 h-4 v-10 h-7 v-4 h7 z" fill="#b3242c"/>
@@ -505,7 +526,7 @@ export const CHARS = [
       win: { w: -90, fUp: 170, fFo: 175 }
     },
     // bow and quiver on the back (the bow moves to the hand while shooting)
-    back: (c, name) => (name === 'bowDraw' || name === 'bowShot') ? `<rect x="-14" y="-28" width="7" height="22" rx="2" fill="#5a3a20" stroke="${OL}" stroke-width="1.8" transform="rotate(-18 -10 -17)"/>` : `
+    back: (c, name) => /bowDraw|bowShot|airDraw|airShot/.test(name) ? `<rect x="-14" y="-28" width="7" height="22" rx="2" fill="#5a3a20" stroke="${OL}" stroke-width="1.8" transform="rotate(-18 -10 -17)"/>` : `
       <path d="M-20 -38 Q-4 -20 -18 8" fill="none" stroke="${OL}" stroke-width="5.5" stroke-linecap="round"/>
       <path d="M-20 -38 Q-4 -20 -18 8" fill="none" stroke="#7a3a1c" stroke-width="3" stroke-linecap="round"/>
       <line x1="-20" y1="-38" x2="-18" y2="8" stroke="#efe6cf" stroke-width="1"/>
@@ -632,17 +653,22 @@ export function renderChar(c, poseName, opts = {}) {
   };
   const arm = (sh, el, h, d) => ln(sh, el, 12, OL) + ln(el, h, 11, OL) + ln(sh, el, 8, d ? dk(c.sleeve) : c.sleeve) + ln(el, h, 7, d ? dk(c.fore) : c.fore);
   const hand = (h, d) => `<circle cx="${f(h[0])}" cy="${f(h[1])}" r="${handR}" fill="${d ? dk(fistWrap) : fistWrap}" stroke="${OL}" stroke-width="2"/>`;
-  const shotFrame = poseName === 'bowDraw' || poseName === 'bowShot' || poseName === 'idle0>bowDraw' || poseName === 'bowDraw>bowShot' || poseName === 'bowShot>idle0';
-  const bowFrame = c.bow && (poseName === 'bowDraw' || poseName === 'bowShot');
+  const shotFrame = /bowDraw|bowShot|airDraw|airShot/.test(poseName);
+  // the archer holds the bow through every shooting frame (ground and air); drawn until the release
+  const bowFrame = c.bow && shotFrame, bowDrawn = !/Shot/.test(poseName);
   // the cowboy draws his revolver for the whole shot (the whip hangs at his belt meanwhile)
   const gunFrame = c.gun && shotFrame;
-  const weapon = (h, ang) => `<g transform="translate(${f(h[0])} ${f(h[1])}) rotate(${ang})">${bowFrame ? BOW(poseName === 'bowDraw') : gunFrame ? REVOLVER(poseName !== 'bowShot' && poseName !== 'bowShot>idle0') : WEAPONS[c.id]()}</g>`;
+  const weapon = (h, ang) => `<g transform="translate(${f(h[0])} ${f(h[1])}) rotate(${ang})">${bowFrame ? BOW(bowDrawn) : gunFrame ? REVOLVER(poseName !== 'bowShot' && poseName !== 'bowShot>idle0') : WEAPONS[c.id]()}</g>`;
+  // the shield rides on the back forearm: behind the body when that hand hangs back, over it when forward
+  const shield = c.shield ? `<g transform="translate(${f(hB[0])} ${f(hB[1])}) rotate(${f(p.lean * 0.5)})">${SHIELD()}</g>` : '';
+  const shieldFront = hB[0] > 2;
 
   let s = '';
   if (c.back) s += `<g transform="rotate(${p.lean})">${c.back(c, poseName, gunFrame)}</g>`;
   if (c.cape) s += `<g transform="rotate(${p.lean})"><path d="M-8 -28 Q-22 -8 -24 16 L-14 18 L-4 8 Z" fill="${c.cape}" stroke="${OL}" stroke-width="2.5" stroke-linejoin="round"/></g>`;
   s += arm(shB, elB, hB, true);
   if (c.dual) s += weapon(hB, p.wB);
+  if (!shieldFront) s += shield;
   s += hand(hB, true);
   s += leg(hipB, kB, aB, true) + leg(hipF, kF, aF, false);
   s += `<g transform="rotate(${p.lean})">${c.torso(c, gunFrame)}</g>`;
@@ -652,6 +678,7 @@ export function renderChar(c, poseName, opts = {}) {
       <circle cx="1" cy="-13" r="14" fill="${c.skin}" stroke="${OL}" stroke-width="3"/>
       <ellipse cx="9.5" cy="-13" rx="1.8" ry="2.5" fill="${OL}"/>
       ${c.headFront(c, p)}</g>`;
+  if (shieldFront) s += shield;
   if (!opts.noFront) s += arm(shF, elF, hF, false) + weapon(hF, p.w) + hand(hF, false);
   const headPos = add(neck, rot([1, -13], p.lean + p.tilt));
   if (c.mount) {

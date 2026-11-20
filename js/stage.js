@@ -433,6 +433,14 @@ class FightScene extends Phaser.Scene {
         this.popText(`-${e.dmg}`, e.x, e.y - 18, '#bfe6ff', 14);
         cam.shake(70, 0.003);
         this.sfx('guard', { volume: 0.7 });
+      } else if (e.type === 'shove') {
+        // shield bash: the opponent is shoved along, no damage
+        this.fx.guard.setEmitterAngle?.({ min: dir > 0 ? -60 : 120, max: dir > 0 ? 60 : 240 });
+        this.fx.guard.explode(12, e.x, e.y);
+        this.ring(e.x, e.y, 0x8fd3ff, 1.2);
+        this.popText('밀침!', e.x, e.y - 30, '#bfe6ff', 14);
+        cam.shake(80, 0.004);
+        this.sfx('guard', { volume: 0.6, rate: 0.9 });
       } else if (e.type === 'armor') {
         // heavy-attack armor: damage lands, the fighter doesn't budge (the sword's hold takes none)
         this.fx.spark.explode(8, e.x, e.y);
@@ -565,7 +573,7 @@ class FightScene extends Phaser.Scene {
 
     g.fighters.forEach((f, i) => {
       const p = this.prev[i];
-      if (f.attack && f.attack !== p.attack && !(f.attack.kind === 'charged' && (f.stats.gun || f.stats.bow))) {
+      if (f.attack && f.attack !== p.attack && !(f.attack.kind === 'charged' && (f.stats.gun || f.stats.bow)) && f.attack.kind !== 'airShot') {
         if (f.weapon === 'whip') this.time.delayedCall(Math.max(0, attackTiming(f).startup / (f.attack.speed ?? 1)) * 1000, () => this.sfx('crack', { volume: 0.6, rate: rnd(0.95, 1.1) }));
         else this.sfx(f.stats.power >= 18 ? 'swingHeavy' : 'swing', { volume: 0.55, rate: rnd(0.92, 1.08) });
       }
@@ -614,12 +622,15 @@ class FightScene extends Phaser.Scene {
       // stag beetle air dash: a streak of afterimage dust
       if (f.blinked) this.sfx('miss', { volume: 0.6, rate: 1.8 });
       if (f.airDash && !p.airDash) { this.ring(f.x, f.y - 40, 0xffd27a, 0.9); this.sfx('miss', { volume: 0.5, rate: 1.4 }); }
+      // the stag's ram and the sword's shield bash both launch with a flash
+      if (f.attack?.kind === 'ram' && p.attack !== f.attack) { this.ring(f.x, f.y - 40, 0xffa040, 1.2); this.sfx('swingHeavy', { volume: 0.6, rate: 1.2 }); }
+      if (f.bash && !p.bash) { this.ring(f.x + f.facing * 14, f.y - 44, 0x8fd3ff, 1.1); this.sfx('guard', { volume: 0.5, rate: 1.3 }); }
       if (f.attack?.fired && !p.fired) this.sfx('bow', { volume: 0.7 });
       if (f.super?.def.spin && !p.spin) this.sfx('whirl', { volume: 0.7 });
 
       // super dash: dust trail from the feet
       if (f.super && f.onGround && Math.abs(f.vx) > 150 && Math.random() < 0.5) this.fx.dust.explode(2, f.x - f.facing * 10, f.y);
-      Object.assign(p, { charging, fired: f.attack?.fired, spin: !!f.super?.def.spin, airDash: f.airDash, attack: f.attack, onGround: f.onGround, vy: f.vy, charge: f.charge, ko: f.ko, doubled: f.doubled, diveLanded: f.attack?.landed });
+      Object.assign(p, { charging, fired: f.attack?.fired, spin: !!f.super?.def.spin, airDash: f.airDash, bash: f.bash, attack: f.attack, onGround: f.onGround, vy: f.vy, charge: f.charge, ko: f.ko, doubled: f.doubled, diveLanded: f.attack?.landed });
     });
 
     if (g.phase !== this.lastPhase) {
@@ -713,7 +724,7 @@ class FightScene extends Phaser.Scene {
       }
       if (v.glow) v.glow.active = !!f.super;
       // dash afterimages
-      const dashing = (f.rush || f.super || f.airDash?.t < 0.3) && Math.abs(f.vx) > 100;
+      const dashing = (f.rush || f.super || f.airDash?.t < 0.3 || f.attack?.kind === 'ram' || f.bash) && Math.hypot(f.vx, f.vy) > 100;
       v.ghosts.forEach((gh, n) => {
         gh.setVisible(dashing);
         if (dashing) show(gh).setScale(sx, sy).setPosition(f.x - f.vx * 0.025 * (n + 1), f.y).setAlpha(0.32 - n * 0.09);
@@ -789,9 +800,9 @@ class FightScene extends Phaser.Scene {
       const p = arrows[k];
       img.setVisible(!!p);
       if (!p) return;
-      // nose follows the arc: slope of h(u) over the horizontal run
-      const dh = (2 * p.a * p.u + p.b) / p.range;
-      img.setPosition(p.x, p.y).setRotation(p.dir > 0 ? -Math.atan(dh) : Math.PI + Math.atan(dh));
+      // nose follows the arc: slope of h(u) over the horizontal run (the air shot flies straight at 45°)
+      const dh = p.diag ? 0 : (2 * p.a * p.u + p.b) / p.range;
+      img.setPosition(p.x, p.y).setRotation(p.angle ?? (p.dir > 0 ? -Math.atan(dh) : Math.PI + Math.atan(dh)));
     });
     this.bombs.forEach((img, k) => {
       const p = bombs[k];

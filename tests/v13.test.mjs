@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dpadDirs, dpadSlopes, DPAD_DIAGONAL, DPAD_RANGE_MOD } from '../js/input.js';
+import { dpadDirs, dpadSlopes, DPAD_DIAGONAL } from '../js/input.js';
 import { Game } from '../js/game.js';
 import { AI } from '../js/ai.js';
 import { NO_INPUT } from '../js/fighter.js';
@@ -30,7 +30,6 @@ test('d-pad: RetroArch 8-way zones — default 80% gives 50° cardinals and 40°
   const s100 = dpadSlopes(100);
   assert.ok(Math.abs(Math.atan(s100.low) * 180 / Math.PI - 22.5) < 0.01);
   assert.ok(Math.abs(Math.atan(s100.high) * 180 / Math.PI - 67.5) < 0.01);
-  assert.equal(DPAD_RANGE_MOD, 1.5);
 });
 
 // Play-style metrics against a passive opponent that drifts and guards but never attacks.

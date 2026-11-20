@@ -1,7 +1,7 @@
 import {
   MAPS, MAP_IDS, VIEW_W, WORLD_W, SPAWN_X, BODY_HALF_W, BODY_H, GROUND_Y,
   HIT_CONFIRM, HITSTOP_BASE, HITSTOP_PER_DMG, HITSTOP_MAX, HITSTOP_GUARD, HIT_STUN, KNOCKBACK_PER_DMG,
-  ARROW_RANGE, ARROW_APEX, ARROW_SPEED, ARROW_MULT, BULLET_RANGE, BULLET_SPEED, BULLET_MULT,
+  ARROW_RANGE, ARROW_APEX, ARROW_SPEED, ARROW_MULT, BULLET_RANGE, BULLET_SPEED, BULLET_MULT, JUMP_ATTACK_MULT,
   SUPPLY_EVERY, SUPPLY_HEAL, SUPPLY_BIG, SUPPLY_FALL, SUPPLY_LINGER, MAX_ENERGY
 } from './config.js';
 import { createFighter, stepFighter, NO_INPUT, dashing, attackPhase } from './fighter.js';
@@ -24,6 +24,16 @@ function makeArrow(f, owner) {
   };
 }
 
+// The archer's air shot: a straight arrow 45° down-forward from the hand, at arrow speed, until the ground.
+function makeAirArrow(f, owner) {
+  const h = f.stats.height ?? BODY_H, d = Math.SQRT1_2;
+  return {
+    type: 'arrow', diag: true, owner, dir: f.facing, kind: 'aerial', x: f.x + f.facing * 14, y: f.y - h * 0.62,
+    vx: f.facing * ARROW_SPEED * d, vy: ARROW_SPEED * d, angle: f.facing > 0 ? Math.PI / 4 : Math.PI * 3 / 4,
+    dmg: Math.round(f.stats.power * JUMP_ATTACK_MULT), t: 0
+  };
+}
+
 // The cowboy's revolver: level flight from the hand, BULLET_RANGE body heights, then it drops.
 function makeBullet(f, owner) {
   const h = f.stats.height ?? BODY_H, x0 = f.x + f.facing * 30;
@@ -33,8 +43,10 @@ function makeBullet(f, owner) {
 const fHalfW = f => f.stats.halfW ?? BODY_HALF_W;
 const fHeight = f => f.stats.height ?? BODY_H;
 
-// Bodies push each other apart; jumping over the opponent is still possible.
+// Bodies push each other apart; jumping over the opponent is still possible. The stag's ram flies
+// straight through, and a shield bash carries the opponent along instead (see shove).
 export function separate(a, b) {
+  if (a.attack?.kind === 'ram' || b.attack?.kind === 'ram' || a.bash || b.bash) return;
   if (Math.abs(a.y - b.y) >= BODY_H * 0.8) return;
   const min = ((a.stats?.halfW ?? BODY_HALF_W) + (b.stats?.halfW ?? BODY_HALF_W)) * 0.9, dx = b.x - a.x;
   if (Math.abs(dx) >= min) return;
@@ -97,8 +109,11 @@ export class Game {
     const [a, b] = this.fighters;
     const world = this.world;
     const before = this.fighters.map(f => !!f.super);
-    // each fighter wants to face the other; stepFighter applies the turn delay
-    for (const [me, op] of [[a, b], [b, a]]) if (Math.abs(op.x - me.x) > 1) me.wantFacing = op.x >= me.x ? 1 : -1;
+    // each fighter wants to face the other; stepFighter applies the turn delay. opPos aims the stag's ram.
+    for (const [me, op] of [[a, b], [b, a]]) {
+      if (Math.abs(op.x - me.x) > 1) me.wantFacing = op.x >= me.x ? 1 : -1;
+      me.opPos = { x: op.x, y: op.y - fHeight(op) / 2 };
+    }
     stepFighter(a, live ? inputs[0] : NO_INPUT, dt, world);
     stepFighter(b, live ? inputs[1] : NO_INPUT, dt, world);
     for (const [i, me, op] of [[0, a, b], [1, b, a]]) {
@@ -140,6 +155,12 @@ export class Game {
           this.effects.push({ type: 'muzzle', x: b.x, y: b.y, dir: me.facing, t: 0, life: 0.25 });
         } else this.projectiles.push(makeArrow(me, i));
       }
+      // the archer's air shot: the arrow leaves 45° down as the release starts
+      if (me.attack?.kind === 'airShot' && !me.attack.fired && attackPhase(me) === 'active') {
+        me.attack.fired = true;
+        this.projectiles.push(makeAirArrow(me, i));
+      }
+      this.shove(me, op, i);
       if (me.rush && me.rush.t === 0) this.effects.push({ type: 'rush', who: i, x: me.x, y: me.y, dir: me.rush.dir, t: 0, life: 0.4 });
       if (me.reel && me.reel.t === 0) this.effects.push({ type: 'reel', who: i, x: me.x, y: me.y, dir: me.reel.dir, t: 0, life: 0.3 });
       this.updateLasso(me, op, i, dt);
@@ -176,6 +197,19 @@ export class Game {
   }
 
   setPhase(p) { this.phase = p; this.phaseT = 0; }
+
+  // Sword's shield bash: an opponent the shield runs into is carried along in front of it (no damage).
+  shove(me, op, i) {
+    if (!me.bash || op.ko || op.super || dashing(op) || Math.abs(op.y - me.y) >= BODY_H * 0.8) return;
+    const contact = fHalfW(me) + fHalfW(op), gap = (op.x - me.x) * me.bash.dir - contact;
+    if (gap > 6 || gap < -contact - 30) return;
+    op.x = Math.max(20, Math.min(WORLD_W - 20, me.x + me.bash.dir * (contact + 4)));
+    op.vx = 0;
+    if (!me.bash.shoved) {
+      me.bash.shoved = true;
+      this.effects.push({ type: 'shove', who: 1 - i, x: me.x + me.bash.dir * (contact + 2), y: me.y - fHeight(me) * 0.55, dir: me.bash.dir, t: 0, life: 0.5 });
+    }
+  }
 
   // Cowboy's lasso: at lasso.at an opponent within the radius (any direction) is caught and pulled
   // in front of him over lasso.pull seconds; the lashes that follow only land on a caught opponent.
@@ -233,15 +267,19 @@ export class Game {
       p.t += dt;
       const op = this.fighters[1 - p.owner], hw = op.stats.halfW ?? BODY_HALF_W, h = op.stats.height ?? BODY_H;
       if (p.type === 'arrow') {
-        p.u += ARROW_SPEED * dt / p.range;
-        p.x = p.x0 + p.dir * p.u * p.range;
-        p.y = p.feet - (p.a * p.u * p.u + p.b * p.u + p.c);
+        if (p.diag) { p.x += p.vx * dt; p.y += p.vy * dt; }
+        else {
+          p.u += ARROW_SPEED * dt / p.range;
+          p.x = p.x0 + p.dir * p.u * p.range;
+          p.y = p.feet - (p.a * p.u * p.u + p.b * p.u + p.c);
+        }
         const inside = Math.abs(op.x - p.x) < hw + 4 && p.y > op.y - h - 4 && p.y < op.y + 2;
         if (live && !op.ko && !op.super && !dashing(op) && !op.rush && inside) { // arrows/bullets can't stop a rush
           p.done = true;
-          const s = { kind: 'charged', dmg: p.dmg, kb: p.dmg * KNOCKBACK_PER_DMG, stun: HIT_STUN };
+          // the charged shot breaks guard; the air shot is an ordinary aerial hit
+          const s = { kind: p.kind ?? 'charged', aerial: p.kind === 'aerial', dmg: p.dmg, kb: p.dmg * KNOCKBACK_PER_DMG, stun: HIT_STUN };
           this.hitFrom({ facing: p.dir, x: p.x, stats: {} }, op, s, p.x, 1 - p.owner);
-        } else if (p.u >= 1) { p.done = true; this.effects.push({ type: 'arrowStuck', x: p.x, y: GROUND_Y, dir: p.dir, t: 0, life: 0.8 }); }
+        } else if (p.diag ? p.y >= GROUND_Y : p.u >= 1) { p.done = true; this.effects.push({ type: 'arrowStuck', x: p.x, y: GROUND_Y, dir: p.dir, t: 0, life: 0.8 }); }
       } else if (p.type === 'bullet') {
         if (!p.dropping) {
           p.x += p.dir * BULLET_SPEED * dt;

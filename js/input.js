@@ -4,7 +4,6 @@
 // the diagonal sensitivity is the size of a diagonal zone relative to a cardinal one; 100% gives
 // 8 equal 45° zones. At 80% each diagonal spans 40° and each cardinal 50° (boundaries 25° / 65°).
 export const DPAD_DIAGONAL = 80;
-export const DPAD_RANGE_MOD = 1.5;     // hitbox growth while held (RetroArch range_mod)
 export const HAPTIC_MS = 12;           // attack/guard tick with one player on touch
 const NO_DIRS = Object.freeze({ up: false, down: false, left: false, right: false });
 
@@ -22,6 +21,13 @@ export function dpadDirs(dx, dy, { low, high } = SLOPES) {
   if (!ax && !ay) return NO_DIRS;
   const vert = ay > low * ax, horiz = ay < high * ax;
   return { up: vert && dy < 0, down: vert && dy > 0, left: horiz && dx < 0, right: horiz && dx > 0 };
+}
+
+// A finger that started on the D-pad keeps pressing until it lifts: wherever it is now, the
+// direction (one or two keys) is read from its angle around the pad center. rect: the pad's box.
+export function dpadAim(rect, x, y) {
+  const R = rect.width / 2;
+  return dpadDirs(x - rect.left - R, y - rect.top - R);
 }
 
 const blank = () => ({ left: false, right: false, jump: false, down: false, attack: false, guard: false });
@@ -58,7 +64,7 @@ const GAME_KEYS = new Set(KEYMAP.flatMap(Object.keys));
 export class InputManager {
   constructor() {
     this.pointers = new Map(); // pointerId → { player, actions: Set } (buttons touched during the stroke)
-    this.dpads = new Map();    // pointerId → { player, el, on, dirs } (touch D-pad)
+    this.dpads = new Map();    // pointerId → { player, el, on, dirs } (touch D-pad; on until the finger lifts)
     this.keys = new Set();
     this.players = 2;
     this.onPadsChanged = () => {};
@@ -73,9 +79,9 @@ export class InputManager {
   // Touch controls, modelled on RetroArch's overlay D-pad (dpad_area):
   // - one cross-shaped area; the direction comes from the angle of the finger from its center,
   //   8-way with diagonal zones sized by DPAD_DIAGONAL (RetroArch default 80%)
-  // - the press must start inside the drawn area; while held the hitbox grows by DPAD_RANGE_MOD
-  //   (RetroArch range_mod) so the thumb can roll around without slipping off; leaving even that
-  //   releases it, and coming back into the drawn area presses again
+  // - the press must start inside the drawn area; from then on, until the finger lifts, it keeps
+  //   pressing whatever direction (single or diagonal) its angle from the center gives, however far
+  //   it has slid away from the pad
   // - the finger slides between directions freely; no dynamic recentering
   // A finger that slides from one action button onto another of the same player keeps both pressed
   // (attack → guard = both). With one player on touch, attack/guard give a short haptic tick.
@@ -85,11 +91,7 @@ export class InputManager {
       return el && !el.classList.contains('off') ? el : null;
     };
     const aim = (st, e) => {
-      const r = st.el.getBoundingClientRect(), R = r.width / 2;
-      const dx = (e.clientX - r.left - R) / R, dy = (e.clientY - r.top - R) / R;
-      const reach = st.on ? DPAD_RANGE_MOD : 1;
-      st.on = Math.abs(dx) <= reach && Math.abs(dy) <= reach;
-      st.dirs = st.on ? dpadDirs(dx, dy) : NO_DIRS;
+      st.dirs = dpadAim(st.el.getBoundingClientRect(), e.clientX, e.clientY);
       st.el.dataset.dirs = Object.keys(st.dirs).filter(k => st.dirs[k]).join(' ');
     };
     const tick = (player, action) => {
@@ -101,7 +103,7 @@ export class InputManager {
       if (!el) return;
       try { el.setPointerCapture(e.pointerId); } catch { /* not supported */ }
       if (el.dataset.action === 'dpad') {
-        const st = { player: +el.dataset.player, el, on: false, dirs: NO_DIRS };
+        const st = { player: +el.dataset.player, el, on: true, dirs: NO_DIRS };
         this.dpads.set(e.pointerId, st);
         aim(st, e);
       } else {

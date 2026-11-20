@@ -1,7 +1,7 @@
 // Gameplay constants. Visuals live in themes/<id>/theme.json.
 
 // Shown on the title screen; keep in step with CACHE in sw.js.
-export const APP_VERSION = 'v13';
+export const APP_VERSION = 'v14';
 
 export const WORLD_W = 1280;
 export const VIEW_W = 640;
@@ -33,13 +33,17 @@ export const TIME_OPTIONS = [60, 90, 120, 150, 180, 210, 240];
 export const WEAPONS = {
   // holdImmune: takes no damage at all during the hold (back-step) attack; holdHaste: after a hold
   // attack that lands, the next attack runs HOLD_HASTE x faster
-  sword:   { name: '칼',       power: 12, reach: 75,  startup: 0.15, active: 0.10, recovery: 0.23, move: 1.0,  guardUp: 0.07, holdImmune: true, holdHaste: true },
+  // shield: guards with a shield; bash: forward double-tap + hold charges two strides behind the raised
+  // shield (guard up at once, shoves the opponent, no damage) and the attack right after has no startup
+  sword:   { name: '칼',       power: 12, reach: 75,  startup: 0.15, active: 0.10, recovery: 0.23, move: 1.0,  guardUp: 0.07, holdImmune: true, holdHaste: true, shield: true, bash: true },
   // longReach / airReach / heavyReach multiply the forward, jump and back-step attack reach
-  spear:   { name: '창',       power: 13, reach: 110, startup: 0.22, active: 0.11, recovery: 0.30, move: 0.95, guardUp: 0.10, longReach: 1.3, airReach: 1.3, heavyReach: 1 },
+  // lunge: the forward attack also lunges that many strides during its startup
+  spear:   { name: '창',       power: 13, reach: 110, startup: 0.22, active: 0.11, recovery: 0.30, move: 0.95, guardUp: 0.10, longReach: 1.3, airReach: 1.3, heavyReach: 1, lunge: 1 },
   axe:     { name: '도끼',     power: 20, reach: 70,  startup: 0.33, active: 0.12, recovery: 0.42, move: 0.9,  guardUp: 0.15 },
   // blink: double-tap forward and hold the second tap to teleport BLINK_DIST x body height ahead
   dagger:  { name: '단검',     power: 8,  reach: 45,  startup: 0.09, active: 0.09, recovery: 0.16, move: 1.1,  guardUp: 0.04, blink: true },
   fist:    { name: '맨손',     power: 6,  reach: 35,  startup: 0.07, active: 0.08, recovery: 0.12, move: 1.15, guardUp: 0.03 },
+  // airDash: the second jump is a level dash; attacking during it rams the opponent (see RAM_*)
   stag:    { name: '큰 턱',    power: 14, reach: 85,  startup: 0.17, active: 0.10, recovery: 0.26, move: 1.0,  guardUp: 0.08, airDash: true },
   // rush: forward double-tap + hold charges the horse ahead (see RUSH_*)
   genghis: { name: '청룡언월도', power: 22, reach: 140, startup: 0.36, active: 0.13, recovery: 0.46, move: 0.85, guardUp: 0.17, halfW: 26, height: 110, rush: true },
@@ -52,6 +56,7 @@ export const WEAPONS = {
   // attack turns the body around into a back kick
   tkd:     { name: '발차기',   power: 8,  reach: 45,  startup: 0.08, active: 0.085, recovery: 0.14, move: 1.12, guardUp: 0.035, heavy: true, heavyHold: 0.2, backKick: true },
   // Joseon archer: sword stats; the charged attack shoots an arrow instead of swinging
+  // bow: the charged attack shoots an arrow; the air attack stops in mid-air and shoots 45° down
   archer:  { name: '활·환도',   power: 12, reach: 75,  startup: 0.15, active: 0.10, recovery: 0.23, move: 1.0,  guardUp: 0.07, bow: true },
   // Old West cowboy: reach 3/4 of the longest (140 → 105), power 2/5 of the highest (22 → 8.8),
   // speed 3/5 of the fastest (fist 0.27s → 0.45s per swing). Whip + revolver.
@@ -74,6 +79,13 @@ export const GUARD_MOVE = 0.35;        // walking speed ratio while guarding
 //           and super armor: hits still deal damage but cause no knockback/stun and don't cancel it.
 export const LONG_ATTACK_SLOW = 1.2;
 export const LONG_REACH_BONUS = 19;
+// One walking stride (the average measured from the rig's walk poses). The spear's forward attack
+// lunges `lunge` strides during its startup; the sword's shield bash covers BASH_DIST strides.
+export const STRIDE = 2 * LONG_REACH_BONUS;
+export const BASH_DIST = 2;
+export const BASH_TIME = 0.35;
+export const BASH_COOLDOWN = 0.6;
+export const BASH_FOLLOW = 0.25;       // an attack this soon after the bash has no startup
 export const HEAVY_REACH = 0.8;
 export const HEAVY_MOVE = 0.35;        // backstep speed ratio during a heavy attack
 // Short-reach fighters (reach <= half of the longest reach) get a double jump.
@@ -141,17 +153,23 @@ export const CHARGE_GUARD_RATIO = 0.5;
 export const CHARGE_BREAK_STUN = 0.45;
 export const SUPER_GAIN_CHARGE_GUARD = 2;
 
-// Stag beetle air dash: its second jump flies level in the travel direction. It ignores hits
-// while flying and can't attack until the last AIR_DASH_ATTACK seconds.
+// Stag beetle air dash: its second jump flies level in the travel direction and ignores hits.
 export const AIR_DASH_DIST = 210;
 export const AIR_DASH_TIME = 0.26;
-export const AIR_DASH_ATTACK = 0.06;
+// Attacking during the dash turns it into a ram straight at the opponent: up to RAM_DIST x the dash
+// distance at the dash speed, passing through, aerial-attack damage. The ram can be hit.
+export const RAM_DIST = 0.8;
 
 // Archer's charged shot: an arc up to 2/3 of the view width whose apex is 1.2x the body height.
 export const ARROW_RANGE = VIEW_W * 2 / 3;
 export const ARROW_APEX = 1.2;         // x body height, measured from the feet
 export const ARROW_SPEED = 620;        // horizontal px/s
 export const ARROW_MULT = 1.5;         // damage vs the normal attack
+// Archer's air attack: hangs where the button was pressed, draws for AIR_SHOT_DRAW and shoots an
+// arrow 45° down-forward at arrow speed (aerial-attack damage, a normal guard blocks it).
+export const AIR_SHOT_DRAW = 0.2;
+export const AIR_SHOT_RELEASE = 0.05;
+export const AIR_SHOT_RECOVERY = 0.12;
 // Cowboy's revolver: loads longer than the bow, flies level at arrow speed for 3.5 body heights,
 // then drops to the ground (a spent bullet does no damage).
 export const GUN_LOAD = 0.45;

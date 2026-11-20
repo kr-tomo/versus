@@ -11,7 +11,7 @@ import { MAP_IDS, VIEW_W, WORLD_W, CAMERA_MARGIN, GROUND_Y, MAX_ENERGY, WEAPONS,
 const SCREENS = [[844, 390], [667, 375], [932, 430], [1180, 820], [1366, 1024], [1920, 1080], [390, 844], [820, 1180], [1024, 600]];
 const near = (a, b, eps = 0.5) => Math.abs(a - b) <= eps;
 
-test('layout: 16:9 view, buttons on screen, no overlap with view or each other', () => {
+test('layout: 16:9 view, buttons on screen, no overlap with each other; only side clusters may ride over the view edge', () => {
   for (const [W, H] of SCREENS) for (const players of [1, 2]) {
     const L = computeLayout(W, H, { players });
     const v = L.view, tag = `${W}x${H} ${players}P ${L.mode}`;
@@ -20,7 +20,12 @@ test('layout: 16:9 view, buttons on screen, no overlap with view or each other',
     for (const b of L.buttons) {
       assert.ok(b.x - b.r >= 0 && b.x + b.r <= W && b.y - b.r >= 0 && b.y + b.r <= H, `${tag} ${b.action} off screen`);
       const inX = b.x + b.r > v.x && b.x - b.r < v.x + v.w, inY = b.y + b.r > v.y && b.y - b.r < v.y + v.h;
-      assert.ok(!(inX && inY), `${tag} ${b.action} overlaps view`);
+      if (L.mode !== 'side') assert.ok(!(inX && inY), `${tag} ${b.action} overlaps view`);
+      else {
+        // an overlay: at most about half of the button is over the view, its center stays near the edge
+        const over = Math.max(0, Math.min(b.x + b.r, v.x + v.w) - Math.max(b.x - b.r, v.x));
+        assert.ok(over <= 2 * b.r * 0.6 + 0.5, `${tag} ${b.action} too far over the view (${over})`);
+      }
     }
     L.buttons.forEach((a, i) => L.buttons.slice(i + 1).forEach(b => assert.ok(Math.hypot(a.x - b.x, a.y - b.y) >= a.r + b.r - 0.5, `${tag} ${a.action}/${b.action} overlap`)));
     assert.equal(L.buttons.length, players * 3, tag); // D-pad + attack, guard
@@ -36,9 +41,11 @@ test('layout: P1 controls left of P2 controls, never stacked top/bottom', () => 
   }
 });
 
-test('layout: wide phones use side gutters, 4:3 tablets use bottom', () => {
-  assert.equal(computeLayout(844, 390).mode, 'side');
-  assert.equal(computeLayout(932, 430).mode, 'side');
+test('layout: wide phones use side gutters for one touch player, 4:3 tablets and two-player phones use bottom', () => {
+  assert.equal(computeLayout(844, 390, { players: 1 }).mode, 'side');
+  assert.equal(computeLayout(932, 430, { players: 1 }).mode, 'side');
+  assert.equal(computeLayout(2400, 900).mode, 'side');            // two clusters fit beside a full-height view
+  assert.equal(computeLayout(844, 390).mode, 'bottom');           // two 1.5x clusters would cover the view
   assert.equal(computeLayout(1180, 820).mode, 'bottom');
   assert.equal(computeLayout(390, 844).mode, 'bottom');
 });

@@ -21,6 +21,8 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 
 /* ---------- touch pads ---------- */
 #controls { position: absolute; inset: 0; pointer-events: none; }
+/* side mode: the clusters sit over the view's bottom corners like an overlay, so let the game show through */
+#controls.overlay .pad { opacity: .82; }
 .pad {
   position: absolute; border-radius: 50%; pointer-events: auto; touch-action: none;
   display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff;

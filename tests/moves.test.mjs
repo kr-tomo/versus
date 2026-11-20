@@ -183,7 +183,7 @@ test('charged: breaks guard for half damage and +2 gauge to the guarder; full da
 });
 
 /* ---------- stag beetle ---------- */
-test('stag: second jump dashes level in the travel direction, untouchable, no attack until its end', () => {
+test('stag: second jump dashes level in the travel direction, untouchable; an attack mid-dash becomes the ram (v14)', () => {
   const f = createFighter('stag', 400, 1);
   step(f, { ...NO_INPUT, jump: true }); step(f, NO_INPUT, 12);
   const y = f.y;
@@ -192,15 +192,18 @@ test('stag: second jump dashes level in the travel direction, untouchable, no at
   const x0 = f.x;
   step(f, { ...NO_INPUT, left: true }, 6);
   assert.ok(Math.abs(f.y - y) < 1, 'level flight');
-  step(f, { ...NO_INPUT, attack: true });
-  assert.equal(f.attack, null, 'no attack mid-dash');
   // untouchable while dashing
   const a = createFighter('spear', f.x + 60, -1);
   a.attack = { t: a.stats.startup + 0.01, kind: 'normal', aerial: false, hit: false }; a.y = f.y;
   assert.equal(resolveHits(a, f, never).length, 0);
-  step(f, NO_INPUT, Math.round((0.26 - 0.05) / DT) - 8);
-  step(f, NO_INPUT);
-  step(f, { ...NO_INPUT, attack: true });
-  assert.equal(f.attack?.kind, 'aerial', 'air attack allowed right before the dash ends');
+  step(f, NO_INPUT, Math.round(0.26 / DT) - 8);
   assert.ok(x0 - f.x > 120);
+  step(f, { ...NO_INPUT, attack: true });
+  assert.equal(f.attack?.kind, 'ram', 'attacking during the dash rams instead');
+  // after the dash: a normal air attack
+  const h = createFighter('stag', 400, 1);
+  step(h, { ...NO_INPUT, jump: true }); step(h, NO_INPUT, 12);
+  step(h, { ...NO_INPUT, jump: true, right: true }); step(h, NO_INPUT, Math.round(0.26 / DT) + 1);
+  step(h, { ...NO_INPUT, attack: true });
+  assert.equal(h.attack?.kind, 'aerial');
 });

@@ -11,4 +11,8 @@
       <rect x="2" y="-16" width="14" height="3.2" fill="#18131f"/>
       <rect x="9" y="-27" width="3" height="28" fill="#9aa2ab"/>
       <circle cx="5" cy="-6" r="1" fill="#18131f"/><circle cx="5" cy="-2" r="1" fill="#18131f"/><circle cx="1" cy="-4" r="1" fill="#18131f"/>
-      <path d="M-11 -24 Q1 -28 14 -24" stroke="#e8edf2" stroke-width="2" fill="none"/></g></g></svg>
+      <path d="M-11 -24 Q1 -28 14 -24" stroke="#e8edf2" stroke-width="2" fill="none"/></g><g transform="translate(22 -8.9) rotate(3)">
+    <path d="M4 -22 Q16 -22 16 -8 Q16 10 4 21 Q-8 10 -8 -8 Q-8 -22 4 -22 Z" fill="#c3cad2" stroke="#18131f" stroke-width="2.6" stroke-linejoin="round"/>
+    <path d="M4 -19 Q13 -19 13 -8 Q13 7 4 17 Q-5 7 -5 -8 Q-5 -19 4 -19 Z" fill="none" stroke="#e8edf2" stroke-width="1.4"/>
+    <path d="M2 -14 h4 v5 h5 v4 h-5 v10 h-4 v-10 h-5 v-4 h5 z" fill="#b3242c"/>
+    <circle cx="4" cy="-8" r="1.2" fill="#8a929b"/><circle cx="4" cy="12" r="1.2" fill="#8a929b"/></g></g></svg>
