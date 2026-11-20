@@ -10,8 +10,8 @@ export const BTN_RATIO = 0.195;
 export const BTN_MIN = 66;
 export const BTN_MAX = 126;
 export const DPAD_RATIO = 0.95;        // D-pad half size in buttons (its width is 1.9 buttons)
-// Side mode stacks attack over guard along a line tilted STACK_ANGLE from the x axis, so the thumb
-// reaches both at about the same radius.
+// Side mode puts guard up and to the right of attack: STACK_ANGLE above the x axis with attack as the
+// origin, so the thumb reaches both at about the same radius.
 export const STACK_ANGLE = 75;
 // Side mode may shrink the view until at most this share of a cluster covers the view's edge.
 export const SIDE_OVERLAP = 0.5;
@@ -27,11 +27,11 @@ export function metrics(W, H) {
   return { btn, gap, margin, sep: Math.round(btn * 0.6), padR: btn * DPAD_RATIO };
 }
 
-// attack at the bottom, guard up the tilted line (shifted toward the view for the thumb's arc)
-function stack(xRight, bottom, m, player) {
+// attack at the bottom-left of the stack, guard up-right of it at STACK_ANGLE
+function stack(xLeft, bottom, m, player) {
   const { btn, gap } = m, r = btn / 2, d = btn + gap;
-  const x0 = xRight - r, y0 = bottom - r;
-  return [{ player, action: 'attack', x: x0, y: y0, r }, { player, action: 'guard', x: x0 - Math.cos(RAD) * d, y: y0 - Math.sin(RAD) * d, r }];
+  const x0 = xLeft + r, y0 = bottom - r;
+  return [{ player, action: 'attack', x: x0, y: y0, r }, { player, action: 'guard', x: x0 + Math.cos(RAD) * d, y: y0 - Math.sin(RAD) * d, r }];
 }
 const stackW = m => m.btn + Math.cos(RAD) * (m.btn + m.gap);
 const stackH = m => m.btn + Math.sin(RAD) * (m.btn + m.gap);
@@ -42,7 +42,7 @@ function sideCluster(x0, bottom, m, player, parts) {
   const out = [];
   let x = x0;
   if (parts.includes('move')) { out.push({ player, action: 'dpad', x: x + m.padR, y: bottom - m.padR, r: m.padR }); x += 2 * m.padR + m.gap; }
-  if (parts.includes('act')) out.push(...stack(x + stackW(m), bottom, m, player));
+  if (parts.includes('act')) out.push(...stack(x, bottom, m, player));
   return out;
 }
 const clusterW = (m, parts) => (parts.includes('move') ? 2 * m.padR : 0) + (parts.length === 2 ? m.gap : 0) + (parts.includes('act') ? stackW(m) : 0);

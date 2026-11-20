@@ -4,8 +4,6 @@ import {
   LONG_REACH_BONUS, HEAVY_REACH, DIVE_REACH, CHARGE_MULT, CHARGE_GUARD_RATIO, CHARGE_BREAK_STUN, SUPER_GAIN_CHARGE_GUARD,
   AIR_LASH_REACH, PARRY_WINDOW, PARRY_FREEZE
 } from './config.js';
-
-const RAM_REACH = 16;                  // the stag's ram hits with its whole body plus this much
 import { attackPhase, superHit, dashing } from './fighter.js';
 
 const halfW = f => f.stats.halfW ?? BODY_HALF_W;
@@ -24,7 +22,6 @@ export function strike(f) {
     : kind === 'heavy' ? st.reach * (st.heavyReach ?? HEAVY_REACH)
     : kind === 'dive' ? DIVE_REACH
     : kind === 'airLash' ? st.reach * AIR_LASH_REACH
-    : kind === 'ram' ? RAM_REACH
     : aerial ? st.reach * (st.airReach ?? 1) : st.reach;
   return { reach, dmg, kb: dmg * KNOCKBACK_PER_DMG, stun: HIT_STUN, aerial, kind, super: false };
 }
@@ -38,8 +35,6 @@ export function hitbox(f, s = strike(f)) {
     const x0 = front, y0 = f.y - h * 0.6, d = s.reach * Math.SQRT1_2, x1 = x0 + f.facing * d, y1 = y0 + d;
     return { x1: Math.min(x0, x1), x2: Math.max(x0, x1), y1: y0, y2: y1, seg: [x0, y0, x1, y1] };
   }
-  // the ram is the body itself flying at the opponent, so it hits on both sides and passes through
-  if (s.kind === 'ram') return { x1: f.x - halfW(f) - s.reach, x2: f.x + halfW(f) + s.reach, y1: f.y - h - 6, y2: f.y + 6 };
   const [y1, y2] = s.tall ? [f.y - 400, f.y + 60] : s.high ? [f.y - h * 1.6, f.y - h * 0.15] : s.kind === 'dive' ? [f.y - h * 0.55, f.y + 22] : s.aerial ? [f.y - h * 0.85, f.y + 12] : [f.y - h * 0.95, f.y - h * 0.25];
   return { x1: Math.min(front, tip), x2: Math.max(front, tip), y1, y2 };
 }

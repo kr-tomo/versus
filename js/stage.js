@@ -622,8 +622,7 @@ class FightScene extends Phaser.Scene {
       // stag beetle air dash: a streak of afterimage dust
       if (f.blinked) this.sfx('miss', { volume: 0.6, rate: 1.8 });
       if (f.airDash && !p.airDash) { this.ring(f.x, f.y - 40, 0xffd27a, 0.9); this.sfx('miss', { volume: 0.5, rate: 1.4 }); }
-      // the stag's ram and the sword's shield bash both launch with a flash
-      if (f.attack?.kind === 'ram' && p.attack !== f.attack) { this.ring(f.x, f.y - 40, 0xffa040, 1.2); this.sfx('swingHeavy', { volume: 0.6, rate: 1.2 }); }
+      // the sword's shield bash launches with a flash
       if (f.bash && !p.bash) { this.ring(f.x + f.facing * 14, f.y - 44, 0x8fd3ff, 1.1); this.sfx('guard', { volume: 0.5, rate: 1.3 }); }
       if (f.attack?.fired && !p.fired) this.sfx('bow', { volume: 0.7 });
       if (f.super?.def.spin && !p.spin) this.sfx('whirl', { volume: 0.7 });
@@ -724,7 +723,7 @@ class FightScene extends Phaser.Scene {
       }
       if (v.glow) v.glow.active = !!f.super;
       // dash afterimages
-      const dashing = (f.rush || f.super || f.airDash?.t < 0.3 || f.attack?.kind === 'ram' || f.bash) && Math.hypot(f.vx, f.vy) > 100;
+      const dashing = (f.rush || f.super || f.airDash?.t < 0.3 || f.bash) && Math.abs(f.vx) > 100;
       v.ghosts.forEach((gh, n) => {
         gh.setVisible(dashing);
         if (dashing) show(gh).setScale(sx, sy).setPosition(f.x - f.vx * 0.025 * (n + 1), f.y).setAlpha(0.32 - n * 0.09);

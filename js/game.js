@@ -43,10 +43,10 @@ function makeBullet(f, owner) {
 const fHalfW = f => f.stats.halfW ?? BODY_HALF_W;
 const fHeight = f => f.stats.height ?? BODY_H;
 
-// Bodies push each other apart; jumping over the opponent is still possible. The stag's ram flies
-// straight through, and a shield bash carries the opponent along instead (see shove).
+// Bodies push each other apart; jumping over the opponent is still possible. A shield bash carries
+// the opponent along instead (see shove).
 export function separate(a, b) {
-  if (a.attack?.kind === 'ram' || b.attack?.kind === 'ram' || a.bash || b.bash) return;
+  if (a.bash || b.bash) return;
   if (Math.abs(a.y - b.y) >= BODY_H * 0.8) return;
   const min = ((a.stats?.halfW ?? BODY_HALF_W) + (b.stats?.halfW ?? BODY_HALF_W)) * 0.9, dx = b.x - a.x;
   if (Math.abs(dx) >= min) return;
@@ -109,11 +109,8 @@ export class Game {
     const [a, b] = this.fighters;
     const world = this.world;
     const before = this.fighters.map(f => !!f.super);
-    // each fighter wants to face the other; stepFighter applies the turn delay. opPos aims the stag's ram.
-    for (const [me, op] of [[a, b], [b, a]]) {
-      if (Math.abs(op.x - me.x) > 1) me.wantFacing = op.x >= me.x ? 1 : -1;
-      me.opPos = { x: op.x, y: op.y - fHeight(op) / 2 };
-    }
+    // each fighter wants to face the other; stepFighter applies the turn delay
+    for (const [me, op] of [[a, b], [b, a]]) if (Math.abs(op.x - me.x) > 1) me.wantFacing = op.x >= me.x ? 1 : -1;
     stepFighter(a, live ? inputs[0] : NO_INPUT, dt, world);
     stepFighter(b, live ? inputs[1] : NO_INPUT, dt, world);
     for (const [i, me, op] of [[0, a, b], [1, b, a]]) {

@@ -8,8 +8,8 @@ import { resolveHits, strike } from '../js/combat.js';
 import { Game } from '../js/game.js';
 import { moveList } from '../js/moves.js';
 import {
-  WEAPONS, WEAPON_IDS, MAX_ENERGY, GROUND_Y, BODY_H, AIR_DASH_DIST, AIR_DASH_TIME, RAM_DIST, STRIDE, BASH_DIST, BASH_TIME,
-  BASH_FOLLOW, AIR_SHOT_DRAW, ARROW_SPEED, JUMP_ATTACK_MULT, LONG_ATTACK_SLOW, WALK_SPEED, APP_VERSION
+  WEAPONS, WEAPON_IDS, MAX_ENERGY, GROUND_Y, BODY_H, STRIDE, BASH_DIST, BASH_TIME, BASH_FOLLOW, AIR_SHOT_DRAW, ARROW_SPEED,
+  JUMP_ATTACK_MULT, WALK_SPEED, APP_VERSION, BULLET_RANGE, BULLET_SPEED, MAPS, GRAVITY, JUMP_V
 } from '../js/config.js';
 
 const DT = 1 / 120;
@@ -51,7 +51,7 @@ test('layout: controls 1.5x bigger — buttons 19.5% of the short side, the D-pa
   }
 });
 
-test('layout: side mode fills the height (no strip under the view) and stacks attack/guard on a 75° line', () => {
+test('layout: side mode fills the height (no strip under the view); guard sits 75° up-right of attack', () => {
   const L = computeLayout(1000, 462, { players: 1 });
   assert.equal(L.mode, 'side');
   // the view is as tall as the clusters allow: 1.5x controls on this phone ride half over the view edge
@@ -59,9 +59,17 @@ test('layout: side mode fills the height (no strip under the view) and stacks at
   const old = 462 - 2 * 8 - 60;  // bottom mode would leave a strip under the view
   assert.ok(L.view.w > old * 16 / 9);
   const a = L.buttons.find(b => b.action === 'attack'), g = L.buttons.find(b => b.action === 'guard');
-  const ang = Math.atan2(a.y - g.y, a.x - g.x) * 180 / Math.PI;
+  const ang = Math.atan2(a.y - g.y, g.x - a.x) * 180 / Math.PI;   // attack as the origin, y up
   assert.ok(Math.abs(ang - STACK_ANGLE) < 0.01, `stack angle ${ang}`);
-  assert.ok(g.y < a.y && g.x < a.x, 'guard sits up and toward the view from attack');
+  assert.ok(g.y < a.y && g.x > a.x, 'guard is up and to the right of attack');
+  for (const [Wd, H] of [[1000, 462], [2400, 900]]) for (const players of [1, 2]) {
+    const L2 = computeLayout(Wd, H, { players });
+    if (L2.mode !== 'side') continue;
+    for (const p of [0, 1].slice(0, players)) {
+      const at = L2.buttons.find(b => b.player === p && b.action === 'attack'), gd = L2.buttons.find(b => b.player === p && b.action === 'guard');
+      assert.ok(gd.x > at.x && gd.y < at.y, `${Wd}x${H} P${p + 1}`);
+    }
+  }
   assert.ok(Math.hypot(a.x - g.x, a.y - g.y) >= a.r + g.r, 'they do not touch');
   // wide and tall screens: a full-height view
   const full = computeLayout(2400, 900, { players: 1 });
@@ -92,6 +100,33 @@ test('archer: the air attack hangs where the button was pressed and shoots an ar
   assert.ok(moveList('archer').rows.find(r => r.kind === '공중 공격').note.includes('45°'));
 });
 
+test('archer: one shot per jump — a second air attack in the same jump is a sword swing; landing resets it', () => {
+  const f = createFighter('archer', 400, 1);
+  step(f, { ...NO_INPUT, jump: true }); step(f, NO_INPUT, 6);
+  step(f, { ...NO_INPUT, attack: true });
+  assert.equal(f.attack?.kind, 'airShot');
+  while (f.attack) step(f);
+  assert.ok(!f.onGround, 'still in the air after the shot');
+  step(f, { ...NO_INPUT, attack: true });
+  assert.equal(f.attack?.kind, 'aerial', 'no second arrow this jump');
+  while (!f.onGround || f.attack) step(f);
+  step(f, { ...NO_INPUT, jump: true }); step(f, NO_INPUT, 6);
+  step(f, { ...NO_INPUT, attack: true });
+  assert.equal(f.attack?.kind, 'airShot', 'a new jump allows a new shot');
+});
+
+test('cowboy: the revolver reaches 1.5x further (5.25 body heights); the moon pulls at 0.8 gravity', () => {
+  assert.equal(BULLET_RANGE, 5.25);
+  const g = fight('whip', 'sword'), [p, q] = g.fighters;
+  p.x = 200; q.x = 200 + 30 + BULLET_RANGE * BODY_H - 10;
+  run(g, 0.45 + 0.02 + WEAPONS.whip.startup + WEAPONS.whip.active + WEAPONS.whip.recovery, () => ({ ...NO_INPUT, attack: true }));
+  run(g, (BULLET_RANGE * BODY_H) / BULLET_SPEED + 0.2);
+  assert.equal(q.energy, MAX_ENERGY - Math.round(WEAPONS.whip.power * 1.5), 'hit at the end of the longer range');
+  assert.equal(MAPS.moon.gravity, 0.8);
+  const apex = gr => JUMP_V * JUMP_V / (2 * GRAVITY * gr);
+  assert.ok(apex(0.8) > apex(1) && apex(0.8) < apex(0.75));
+});
+
 test('archer: the air shot is blocked by an ordinary guard (it is not a charged shot)', () => {
   const g = fight('archer', 'sword'), [p, q] = g.fighters;
   p.x = 400; q.x = 400 + 150;
@@ -100,55 +135,6 @@ test('archer: the air shot is blocked by an ordinary guard (it is not a charged 
   run(g, DT, () => ({ ...NO_INPUT, attack: true }));
   run(g, 1, () => NO_INPUT, () => ({ ...NO_INPUT, guard: true }));
   assert.equal(q.energy, MAX_ENERGY - 1);
-});
-
-/* ---------- stag beetle ---------- */
-test('stag: attacking during the air dash rams straight at the opponent, 0.8x the dash distance, passing through', () => {
-  // the opponent hangs in the air at the stag's height, so the ram runs its full length
-  const g = fight('stag', 'sword'), [p, q] = g.fighters;
-  p.x = 400; q.x = 400 + 120;
-  const hold = y => () => { q.y = y; q.vy = 0; q.onGround = false; return NO_INPUT; };
-  run(g, DT, () => ({ ...NO_INPUT, jump: true }));
-  run(g, 0.08);
-  run(g, DT, () => ({ ...NO_INPUT, jump: true, right: true }));
-  assert.ok(p.airDash, 'dashing');
-  run(g, 0.03, () => ({ ...NO_INPUT, right: true }));
-  const x0 = p.x, y0 = p.y, qx0 = q.x;
-  run(g, DT, () => ({ ...NO_INPUT, attack: true }), hold(y0));
-  assert.equal(p.attack?.kind, 'ram'); assert.equal(p.airDash, null);
-  const [ux, uy] = p.attack.dir;
-  assert.ok(ux > 0.99 && Math.abs(uy) < 0.1, 'aimed straight at the opponent');
-  // run until the ram ends (impact hitstop pauses the clock)
-  for (let i = 0; i < 120 && p.attack?.kind === 'ram'; i++) g.update(DT, [NO_INPUT, hold(y0)()]);
-  const flown = Math.hypot(p.x - x0, p.y - y0);
-  assert.ok(flown <= RAM_DIST * AIR_DASH_DIST + 2 && flown >= RAM_DIST * AIR_DASH_DIST - 2, `flew ${flown}`);
-  assert.equal(q.energy, MAX_ENERGY - Math.round(WEAPONS.stag.power * JUMP_ATTACK_MULT), 'aerial damage, once');
-  assert.ok(p.x > qx0 + 10, 'passed through to the far side of where the opponent hung');
-  assert.ok(Math.abs(p.vx) < 1, 'stops dead');
-  // a grounded opponent: the ram dives at its body and ends when the stag lands
-  const h = fight('stag', 'sword'), [r, u] = h.fighters;
-  r.x = 400; u.x = 520;
-  run(h, DT, () => ({ ...NO_INPUT, jump: true }));
-  run(h, 0.08);
-  run(h, DT, () => ({ ...NO_INPUT, jump: true, right: true }));
-  run(h, 0.03, () => ({ ...NO_INPUT, right: true }));
-  run(h, DT, () => ({ ...NO_INPUT, attack: true }));
-  assert.ok(r.attack.dir[1] > 0.3, 'aimed down at the grounded body');
-  for (let i = 0; i < 120 && r.attack?.kind === 'ram'; i++) h.update(DT, [NO_INPUT, NO_INPUT]);
-  assert.ok(r.onGround && u.energy === MAX_ENERGY - 21, 'landed after hitting');
-  assert.ok(moveList('stag').rows.some(r => r.name === '집게 돌격'));
-});
-
-test('stag: the ram can be hit (unlike the dash)', () => {
-  const p = createFighter('stag', 400, 1), a = createFighter('spear', 460, -1);
-  step(p, { ...NO_INPUT, jump: true }); step(p, NO_INPUT, 12);
-  step(p, { ...NO_INPUT, jump: true, right: true }); step(p, { ...NO_INPUT, right: true }, 3);
-  a.y = p.y; a.attack = { t: a.stats.startup + 0.01, kind: 'normal', aerial: false, hit: false };
-  assert.equal(resolveHits(a, p, never).length, 0, 'untouchable while dashing');
-  step(p, { ...NO_INPUT, attack: true });
-  assert.equal(p.attack.kind, 'ram');
-  a.attack = { t: a.stats.startup + 0.01, kind: 'normal', aerial: false, hit: false }; a.y = p.y;
-  assert.ok(resolveHits(a, p, never).some(e => e.defender === p && e.damage > 0), 'the ram takes the hit');
 });
 
 /* ---------- spear ---------- */
@@ -168,7 +154,7 @@ test('spear: the forward attack lunges one more stride during its startup', () =
 });
 
 /* ---------- sword ---------- */
-test('sword: forward double-tap + hold bashes two strides behind the shield, guard up at once, no damage', () => {
+test('sword: forward double-tap + hold bashes three strides behind the shield at 1.5x the old pace, guard up at once, no damage', () => {
   const g = fight('sword', 'axe'), [p, q] = g.fighters;
   p.x = 400; q.x = 400 + 120;
   doubleTap(p, 'right');
@@ -177,6 +163,8 @@ test('sword: forward double-tap + hold bashes two strides behind the shield, gua
   const x0 = p.x;
   run(g, BASH_TIME + DT, () => ({ ...NO_INPUT, right: true }), () => ({ ...NO_INPUT, attack: true }));
   assert.ok(Math.abs(p.x - x0 - BASH_DIST * STRIDE) < 6, `moved ${p.x - x0}`);
+  assert.equal(BASH_DIST, 3);
+  assert.ok(Math.abs(BASH_DIST * STRIDE / BASH_TIME - 1.5 * (2 * STRIDE / 0.35)) < 1e-9, '1.5x the first version\'s speed');
   assert.equal(p.bash, null, 'over');
   assert.ok(q.x >= p.x + 28 - 1, 'the opponent was shoved along in front of the shield');
   assert.equal(q.energy, MAX_ENERGY, 'the shove does no damage');
@@ -212,9 +200,9 @@ test('sword: an attack during or right after the bash has no startup; the shield
   for (const w of WEAPON_IDS) assert.equal(!!WEAPONS[w].bash, w === 'sword');
 });
 
-test('frames: the sprite sheets carry the shield-bash and air-shot frames; version v14', () => {
+test('frames: the sprite sheets carry the shield-bash and air-shot frames; version v15', () => {
   const theme = JSON.parse(readFileSync(new URL('../themes/classic/theme.json', import.meta.url)));
   for (const w of WEAPON_IDS) for (const n of ['bash', 'bash1', 'bash>bash1', 'bash1>bash', 'airDraw', 'airShot', 'jump>airDraw', 'airDraw>airShot', 'airShot>fall'])
     assert.ok(n in theme.characters[w].frames, `${w} ${n}`);
-  assert.equal(APP_VERSION, 'v14');
+  assert.equal(APP_VERSION, 'v15');
 });

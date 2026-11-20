@@ -1,7 +1,7 @@
 // Gameplay constants. Visuals live in themes/<id>/theme.json.
 
 // Shown on the title screen; keep in step with CACHE in sw.js.
-export const APP_VERSION = 'v14';
+export const APP_VERSION = 'v15';
 
 export const WORLD_W = 1280;
 export const VIEW_W = 640;
@@ -43,7 +43,6 @@ export const WEAPONS = {
   // blink: double-tap forward and hold the second tap to teleport BLINK_DIST x body height ahead
   dagger:  { name: '단검',     power: 8,  reach: 45,  startup: 0.09, active: 0.09, recovery: 0.16, move: 1.1,  guardUp: 0.04, blink: true },
   fist:    { name: '맨손',     power: 6,  reach: 35,  startup: 0.07, active: 0.08, recovery: 0.12, move: 1.15, guardUp: 0.03 },
-  // airDash: the second jump is a level dash; attacking during it rams the opponent (see RAM_*)
   stag:    { name: '큰 턱',    power: 14, reach: 85,  startup: 0.17, active: 0.10, recovery: 0.26, move: 1.0,  guardUp: 0.08, airDash: true },
   // rush: forward double-tap + hold charges the horse ahead (see RUSH_*)
   genghis: { name: '청룡언월도', power: 22, reach: 140, startup: 0.36, active: 0.13, recovery: 0.46, move: 0.85, guardUp: 0.17, halfW: 26, height: 110, rush: true },
@@ -82,7 +81,7 @@ export const LONG_REACH_BONUS = 19;
 // One walking stride (the average measured from the rig's walk poses). The spear's forward attack
 // lunges `lunge` strides during its startup; the sword's shield bash covers BASH_DIST strides.
 export const STRIDE = 2 * LONG_REACH_BONUS;
-export const BASH_DIST = 2;
+export const BASH_DIST = 3;            // strides; 3 strides in 0.35s is 1.5x the pace of the first (2-stride) version
 export const BASH_TIME = 0.35;
 export const BASH_COOLDOWN = 0.6;
 export const BASH_FOLLOW = 0.25;       // an attack this soon after the bash has no startup
@@ -153,12 +152,11 @@ export const CHARGE_GUARD_RATIO = 0.5;
 export const CHARGE_BREAK_STUN = 0.45;
 export const SUPER_GAIN_CHARGE_GUARD = 2;
 
-// Stag beetle air dash: its second jump flies level in the travel direction and ignores hits.
+// Stag beetle air dash: its second jump flies level in the travel direction. It ignores hits
+// while flying and can't attack until the last AIR_DASH_ATTACK seconds.
 export const AIR_DASH_DIST = 210;
 export const AIR_DASH_TIME = 0.26;
-// Attacking during the dash turns it into a ram straight at the opponent: up to RAM_DIST x the dash
-// distance at the dash speed, passing through, aerial-attack damage. The ram can be hit.
-export const RAM_DIST = 0.8;
+export const AIR_DASH_ATTACK = 0.06;
 
 // Archer's charged shot: an arc up to 2/3 of the view width whose apex is 1.2x the body height.
 export const ARROW_RANGE = VIEW_W * 2 / 3;
@@ -166,14 +164,15 @@ export const ARROW_APEX = 1.2;         // x body height, measured from the feet
 export const ARROW_SPEED = 620;        // horizontal px/s
 export const ARROW_MULT = 1.5;         // damage vs the normal attack
 // Archer's air attack: hangs where the button was pressed, draws for AIR_SHOT_DRAW and shoots an
-// arrow 45° down-forward at arrow speed (aerial-attack damage, a normal guard blocks it).
+// arrow 45° down-forward at arrow speed (aerial-attack damage, a normal guard blocks it). One shot
+// per jump; a second air attack in the same jump is an ordinary sword swing.
 export const AIR_SHOT_DRAW = 0.2;
 export const AIR_SHOT_RELEASE = 0.05;
 export const AIR_SHOT_RECOVERY = 0.12;
 // Cowboy's revolver: loads longer than the bow, flies level at arrow speed for 3.5 body heights,
 // then drops to the ground (a spent bullet does no damage).
 export const GUN_LOAD = 0.45;
-export const BULLET_RANGE = 3.5;       // x body height
+export const BULLET_RANGE = 5.25;      // x body height (1.5x the old 3.5)
 export const BULLET_SPEED = ARROW_SPEED;
 export const BULLET_MULT = 1.5;
 
@@ -240,7 +239,7 @@ export const MAPS = {
   savanna: { name: '초원',        trap: '악어 늪',       trapWidth: 90, traps: [2, 2], platforms: [2, 3], platformRise: [72, 92], trapDps: 9,  ice: false, trapReact: true, trapEvent: 'bite' },
   market:  { name: '전통시장',    trap: '생선가게 대게', trapWidth: 80, traps: [1, 2], platforms: [3, 4], platformRise: [70, 94], trapDps: 7,  ice: false, trapReact: true, trapEvent: 'pinch' },
   // gravity: multiplier on GRAVITY (the moon base is floaty)
-  moon:    { name: '달 기지',     trap: '방사능 지역',   trapWidth: 90, traps: [2, 3], platforms: [2, 3], platformRise: [72, 96], trapDps: 8,  ice: false, gravity: 0.75 }
+  moon:    { name: '달 기지',     trap: '방사능 지역',   trapWidth: 90, traps: [2, 3], platforms: [2, 3], platformRise: [72, 96], trapDps: 8,  ice: false, gravity: 0.8 }
 };
 export const MAP_IDS = Object.keys(MAPS);
 export const PLATFORM_WIDTHS = [120, 150, 180, 210];
